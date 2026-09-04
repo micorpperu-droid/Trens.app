@@ -53,9 +53,6 @@ interface PWAGuardProps {
 // MAIN COMPONENT
 // ============================================================================
 export function PWAGuard({ children, moduleName = 'este módulo' }: PWAGuardProps) {
-  // Si REQUIRE_PWA está desactivado, permitir acceso directo
-  if (!REQUIRE_PWA) return <>{children}</>;
-
   const router = useRouter();
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
   const pulseAnim = useSharedValue(1);
@@ -116,6 +113,9 @@ export function PWAGuard({ children, moduleName = 'este módulo' }: PWAGuardProp
   const pulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseAnim.value }],
   }));
+
+  // Si REQUIRE_PWA está desactivado, permitir acceso directo (hooks ya se llamaron arriba)
+  if (!REQUIRE_PWA) return <>{children}</>;
 
   // Still checking...
   if (isAllowed === null) {

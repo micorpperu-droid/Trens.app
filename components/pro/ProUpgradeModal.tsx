@@ -25,7 +25,7 @@ import {
   Camera,
   Video,
   Brain,
-  Dna,
+  ShieldUser,
   Dumbbell,
   Globe,
   Smartphone,
@@ -91,7 +91,7 @@ const PRO_FEATURES_LIST = [
   { icon: Zap, label: 'Publicar en el Feed' },
   { icon: Shield, label: 'Bóveda privada + historial' },
   { icon: Brain, label: 'Asistente HANK con IA' },
-  { icon: Dna, label: 'Métricas ADN atlético' },
+  { icon: ShieldUser, label: 'Métricas PRIME atlético' },
   { icon: Dumbbell, label: 'Nutrición y suplementos' },
 ];
 

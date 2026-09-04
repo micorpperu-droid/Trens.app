@@ -46,6 +46,7 @@ import {
   Crown,
   Brain,
   Dna,
+  ShieldUser,
   Video,
   ShoppingCart,
   Smartphone,
@@ -584,7 +585,7 @@ const PhoneVideoDemo = () => {
           5 módulos, <Text style={{ color: PREMIUM_COLORS.fireRed }}>una sola app</Text>
         </Text>
         <Text className="text-zinc-400 text-sm text-center mt-4 max-w-md px-4">
-          Mira cómo se ve TRENS por dentro. Feed, ADN, PRO, GYM y PLAN — todo lo que necesitas para
+          Mira cómo se ve TRENS por dentro. Feed, PRIME, PRO, GYM y CEO — todo lo que necesitas para
           organizar tu entrenamiento.
         </Text>
       </Animated.View>
@@ -1663,8 +1664,8 @@ export default function LandingPage() {
             />
 
             <PremiumFeatureCard
-              icon={Dna}
-              title="ADN Atlético"
+              icon={ShieldUser}
+              title="PRIME Atlético"
               description="Tu perfil completo: medidas corporales (peso, grasa, masa muscular), récords personales, macros objetivo, fotos de progreso con comparativas en timeline, badges y stats de volumen semanal. TrensID Card compartible."
               delay={400}
               index={6}

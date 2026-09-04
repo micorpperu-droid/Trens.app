@@ -155,7 +155,7 @@ export default function TermsScreen() {
           grabación de sesiones de entrenamiento{'\n'}• Plan nutricional personalizado{'\n'}• Stack
           de suplementación{'\n'}• Asistente virtual HANK con inteligencia artificial{'\n'}• Feed
           social de videos de entrenamiento{'\n'}• Integración con Spotify para música{'\n'}•
-          Métricas ADN atlético
+          Métricas PRIME atlético
         </Section>
 
         <Section

@@ -8389,7 +8389,7 @@ export async function hankGetCapabilities(): Promise<HankToolResult> {
     success: true,
     message: capabilities,
     data: {
-      modules: ['GYM', 'PLAN', 'ADN', 'PRO', 'MOTO', 'SURF', 'AUTO'],
+      modules: ['GYM', 'CEO', 'PRIME', 'PRO', 'MOTO', 'SURF', 'AUTO'],
       toolCount: 70,
     },
   };

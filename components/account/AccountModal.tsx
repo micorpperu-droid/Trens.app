@@ -47,9 +47,9 @@ import {
   Plus,
   Star,
   Play,
-  Dna,
+  ShieldUser,
   Crosshair,
-  ChartLine,
+  Form,
   Dumbbell,
   ShieldAlert,
   UserX,
@@ -232,9 +232,9 @@ export default function AccountModal({
     },
     {
       key: 'adn',
-      label: 'ADN',
+      label: 'PRIME',
       subtitle: 'Perfil atlético',
-      Icon: Dna,
+      Icon: ShieldUser,
     },
     {
       key: 'pro',
@@ -244,9 +244,9 @@ export default function AccountModal({
     },
     {
       key: 'plan',
-      label: 'PLAN',
+      label: 'CEO',
       subtitle: 'Timeline metabólico',
-      Icon: ChartLine,
+      Icon: Form,
     },
     {
       key: 'gym',

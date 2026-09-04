@@ -83,7 +83,7 @@ export const SPORT_TAB_CONFIG: Record<
 > = {
   GYM: {
     tab4: { name: 'GYM', icon: 'Dumbbell' },
-    tab5: { name: 'PLAN', icon: 'Timeline' },
+    tab5: { name: 'CEO', icon: 'Timeline' },
     color: '#DC2626',
   },
   MOTO: {
@@ -174,7 +174,7 @@ export function SportProvider({ children }: { children: ReactNode }) {
           color_primary: '#DC2626',
           tab_4_name: 'GYM',
           tab_4_icon: 'Dumbbell',
-          tab_5_name: 'PLAN',
+          tab_5_name: 'CEO',
           tab_5_icon: 'Utensils',
           inventory_categories: [],
           available_tools: [],
@@ -439,7 +439,7 @@ export function SportProvider({ children }: { children: ReactNode }) {
   // -------------------------------------------------------------------------
   const getTabConfig = useCallback(() => {
     if (activeSport) {
-      const isPlanTab = (activeSport.tab_5_name || '').trim().toUpperCase() === 'PLAN';
+      const isPlanTab = (activeSport.tab_5_name || '').trim().toUpperCase() === 'CEO';
       return {
         tab4: { name: activeSport.tab_4_name, icon: activeSport.tab_4_icon },
         tab5: {

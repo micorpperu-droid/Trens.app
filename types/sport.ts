@@ -206,7 +206,7 @@ export interface TabConfig {
 export const SPORT_TAB_CONFIGS: Record<SportCode, TabConfig> = {
   GYM: {
     tab4: { name: 'GYM', icon: 'Dumbbell', route: 'gym' },
-    tab5: { name: 'PLAN', icon: 'Utensils', route: 'plan' },
+    tab5: { name: 'CEO', icon: 'Utensils', route: 'plan' },
     color: '#DC2626',
   },
   MOTO: {

@@ -6,9 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Play,
   User,
-  Dna,
+  ShieldUser,
   Zap,
-  ChartLine,
+  Form,
   Crosshair,
   Dumbbell,
   Utensils,
@@ -57,10 +57,10 @@ const ED_HARDY = {
 const ICON_MAP: Record<string, LucideIcon> = {
   Play,
   User,
-  Dna,
+  ShieldUser,
   Zap,
-  Timeline: ChartLine,
-  ChartLine,
+  Timeline: Form,
+  Form,
   Crosshair,
   Dumbbell,
   Utensils,
@@ -372,8 +372,8 @@ export default function TabsLayout() {
   // Iconos dinámicos para tabs 4 y 5
   const Tab4Icon = getIconComponent(tabConfig.tab4.icon);
   const Tab5Icon = getIconComponent(tabConfig.tab5.icon);
-  const isPlanTab = (tabConfig.tab5.name || '').trim().toUpperCase() === 'PLAN';
-  const PlanTabIcon = isPlanTab ? ChartLine : Tab5Icon;
+  const isPlanTab = (tabConfig.tab5.name || '').trim().toUpperCase() === 'CEO';
+  const PlanTabIcon = isPlanTab ? Form : Tab5Icon;
   const sportColor = tabConfig.color;
 
   // Altura dinámica del tab bar basada en safe area
@@ -609,12 +609,12 @@ export default function TabsLayout() {
             }}
           />
 
-          {/* ADN - Perfil + Bóveda + Configuración */}
+          {/* PRIME - Perfil + Bóveda + Configuración */}
           <Tabs.Screen
             name="adn/index"
             options={{
-              title: 'ADN',
-              tabBarIcon: ({ color }) => <TabIcon Icon={Dna} color={color} size={26} />,
+              title: 'PRIME',
+              tabBarIcon: ({ color }) => <TabIcon Icon={ShieldUser} color={color} size={26} />,
             }}
           />
 

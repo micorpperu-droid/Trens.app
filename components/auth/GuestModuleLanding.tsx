@@ -23,6 +23,8 @@ import {
   ShoppingBag,
   LogIn,
   Flame,
+  ShieldUser,
+  Form,
   LucideIcon,
 } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -54,12 +56,12 @@ interface ModuleConfig {
 const MODULE_CONFIG: Record<ModuleId, ModuleConfig> = {
   adn: {
     id: 'adn',
-    name: 'ADN',
+    name: 'PRIME',
     tagline: 'Tu perfil atlético completo',
     description:
       'Registra tu composición corporal, récords personales, fotos de progreso y macros diarios. Tu identidad como atleta, toda en un solo lugar.',
     accentColor: '#F97316',
-    MainIcon: Dna,
+    MainIcon: ShieldUser,
     features: [
       { icon: BarChart3, label: 'Macros calculados con IA' },
       { icon: Camera, label: 'Fotos de progreso con comparativa' },
@@ -84,12 +86,12 @@ const MODULE_CONFIG: Record<ModuleId, ModuleConfig> = {
   },
   plan: {
     id: 'plan',
-    name: 'PLAN',
+    name: 'CEO',
     tagline: 'Tu agenda metabólica completa',
     description:
       'Planifica comidas por horario con ingredientes exactos, macros calculados automáticamente, stack de suplementos y lista de compras generada al instante.',
     accentColor: '#22C55E',
-    MainIcon: Utensils,
+    MainIcon: Form,
     features: [
       { icon: Utensils, label: 'Comidas por horario con ingredientes' },
       { icon: Brain, label: 'Macros calculados con inteligencia artificial' },

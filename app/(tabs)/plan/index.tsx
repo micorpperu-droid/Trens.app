@@ -285,7 +285,7 @@ function Tab5RouterContent() {
 
 export default function Tab5Router() {
   return (
-    <PWAGuard moduleName="PLAN">
+    <PWAGuard moduleName="CEO">
       <Tab5RouterContent />
     </PWAGuard>
   );

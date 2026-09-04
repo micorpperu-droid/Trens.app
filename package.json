@@ -90,6 +90,7 @@
     "babel-preset-expo": "~54.0.9",
     "dotenv": "^17.2.3",
     "eslint-config-expo": "^10.0.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9.1.7",
     "patch-package": "^8.0.1",
     "postcss": "^8.4.0",
