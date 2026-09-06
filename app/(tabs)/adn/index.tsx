@@ -921,6 +921,13 @@ function AdnScreenContent() {
           </View>
         </View>
 
+        {/* SELECTOR DE DEPORTES — alternar/agregar deportes (GYM/MOTO/AUTO/SURF) */}
+        {isOwner && (
+          <View className="px-4 mt-4">
+            <SportBadges />
+          </View>
+        )}
+
         {/* TODAY CARDS - Entrenamiento y Próxima Comida/Stack */}
         {isOwner && user && (
           <View className="mt-6">

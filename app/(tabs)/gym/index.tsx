@@ -107,10 +107,7 @@ import { calculateFabPositions } from '../../../constants/floatingTools';
 import { CardioBlock } from '../../../components/plan/CardioBlockCard';
 import { AddCardioModal, AddCardioData } from '../../../components/plan/AddCardioModal';
 import { FocusCardioSlide } from '../../../components/gym/FocusCardioSlide';
-
-// Import sport-specific screens
-import GarajeScreen from '../garaje';
-import TablaScreen from '../tabla';
+import { SportEquipmentLocationScreen } from '../../../components/sport/SportEquipmentLocationScreen';
 
 // ============================================================================
 // HELPERS
@@ -550,17 +547,12 @@ function Tab4RouterContent() {
   const { activeSport } = useSport();
   const sportCode = activeSport?.code || 'GYM';
 
-  // Renderizar pantalla según deporte
-  switch (sportCode) {
-    case 'MOTO':
-    case 'AUTO':
-      return <GarajeScreen />;
-    case 'SURF':
-      return <TablaScreen />;
-    case 'GYM':
-    default:
-      return <GymScreen />;
+  // GYM conserva la pantalla original (constructor de rutinas). El resto de
+  // deportes usa la nueva estructura genérica: Equipo + Lugares.
+  if (sportCode === 'GYM' || !activeSport) {
+    return <GymScreen />;
   }
+  return <SportEquipmentLocationScreen sport={activeSport} />;
 }
 
 export default function Tab4Router() {

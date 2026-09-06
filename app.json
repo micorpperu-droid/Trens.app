@@ -117,7 +117,14 @@
           "sounds": []
         }
       ],
-      "@sentry/react-native"
+      "@sentry/react-native",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Permitir a TRENS acceder a tu ubicación para mostrarla en el buscador de mapas."
+        }
+      ]
     ],
     "scheme": "trensdev",
     "sdkVersion": "54.0.0",

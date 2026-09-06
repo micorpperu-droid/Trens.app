@@ -82,7 +82,7 @@ export const SPORT_TAB_CONFIG: Record<
   }
 > = {
   GYM: {
-    tab4: { name: 'GYM', icon: 'Dumbbell' },
+    tab4: { name: 'SPORT', icon: 'Zap' },
     tab5: { name: 'CEO', icon: 'Timeline' },
     color: '#DC2626',
   },
@@ -172,8 +172,8 @@ export function SportProvider({ children }: { children: ReactNode }) {
           description: 'Entrenamiento de fuerza',
           icon: 'Dumbbell',
           color_primary: '#DC2626',
-          tab_4_name: 'GYM',
-          tab_4_icon: 'Dumbbell',
+          tab_4_name: 'SPORT',
+          tab_4_icon: 'Zap',
           tab_5_name: 'CEO',
           tab_5_icon: 'Utensils',
           inventory_categories: [],

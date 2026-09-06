@@ -27,6 +27,7 @@ import { AddOptionModal } from '../../../components/plan/AddOptionModal';
 import { hankToolsEvent } from '../../../lib/hankToolsEvent';
 import { PlanNotesModal } from '../../../components/plan/PlanNotesModal';
 import { AddCardioModal, AddCardioData } from '../../../components/plan/AddCardioModal';
+import { EventTimelineCard, TimelineEventData } from '../../../components/plan/EventTimelineCard';
 import { supabase } from '../../../lib/supabase';
 import { useHank } from '../../../context/HankContext';
 import { useSaveGuard } from '../../_layout';
@@ -111,8 +112,8 @@ interface WorkoutBlockData {
 }
 
 interface TimelineItem {
-  type: 'meal' | 'stack' | 'workout' | 'cardio';
-  data: Meal | Stack | WorkoutBlockData | CardioBlock;
+  type: 'meal' | 'stack' | 'workout' | 'cardio' | 'event';
+  data: Meal | Stack | WorkoutBlockData | CardioBlock | TimelineEventData;
   time?: string;
 }
 
@@ -376,6 +377,9 @@ function PlanScreen() {
   const [editingCardioId, setEditingCardioId] = useState<string | null>(null);
   const [editingCardioData, setEditingCardioData] = useState<AddCardioData | null>(null);
 
+  // Eventos del deporte (agendados desde la sección Sport) para el día de hoy
+  const [sportEvents, setSportEvents] = useState<TimelineEventData[]>([]);
+
   // Workout time estimation - calcula dinámicamente basándose en posición del bloque
   const [workoutTimeEstimate, setWorkoutTimeEstimate] = useState<WorkoutTimeEstimate>({
     estimatedTime: null,
@@ -578,6 +582,19 @@ function PlanScreen() {
       } else {
         setCardioBlocks([]);
       }
+
+      // Fetch eventos del deporte agendados para HOY (sport_events, alimenta la
+      // tarjeta genérica del timeline — se crean desde la sección Sport)
+      const todayISO = new Date().toISOString().split('T')[0];
+      const { data: eventsData } = await supabase
+        .from('sport_events')
+        .select(
+          'id, event_time, maps_url, latitude, longitude, location, notes, media_url, media_type'
+        )
+        .eq('user_id', user.id)
+        .eq('event_date', todayISO);
+
+      setSportEvents((eventsData as TimelineEventData[]) || []);
 
       // Fetch workout block position (both sessions)
       const { data: posData, error: posError } = await supabase
@@ -1178,6 +1195,21 @@ function PlanScreen() {
     setCardioBlocks((prev) =>
       prev.map((c) => (c.id === cardioId ? { ...c, is_completed: completed } : c))
     );
+  };
+
+  const handleDeleteSportEvent = async (eventId: string) => {
+    Alert.alert('Eliminar evento', '¿Quieres eliminar este evento?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: async () => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          await supabase.from('sport_events').delete().eq('id', eventId);
+          setSportEvents((prev) => prev.filter((e) => e.id !== eventId));
+        },
+      },
+    ]);
   };
 
   const handleCardioTimeChange = (cardioId: string) => {
@@ -1808,6 +1840,11 @@ function PlanScreen() {
       ...meals.map((m) => ({ type: 'meal' as const, data: m, time: m.time })),
       ...groupedStacks.map((s) => ({ type: 'stack' as const, data: s, time: s.time })),
       ...regularCardio.map((c) => ({ type: 'cardio' as const, data: c, time: c.scheduled_time })),
+      ...sportEvents.map((e) => ({
+        type: 'event' as const,
+        data: e,
+        time: e.event_time || '00:00',
+      })),
     ].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
     // Insert workout block A at position
@@ -2361,6 +2398,18 @@ function PlanScreen() {
                       onDelete={handleDeleteCardio}
                       onEdit={handleEditCardio}
                     />
+                  </View>
+                );
+              }
+
+              if (item.type === 'event') {
+                const sportEvent = item.data as TimelineEventData;
+                return (
+                  <View
+                    key={sportEvent.id}
+                    onLayout={(e) => handleItemLayout(timelineIndex, e.nativeEvent.layout.y)}
+                  >
+                    <EventTimelineCard event={sportEvent} onDelete={handleDeleteSportEvent} />
                   </View>
                 );
               }

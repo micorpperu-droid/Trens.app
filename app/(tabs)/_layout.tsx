@@ -33,6 +33,7 @@ import { useAuth, useProRecording } from '../_layout';
 import { useSport } from '../../context/SportContext';
 import { HankOverlay } from '../../components/hank/HankOverlay';
 import { SpotifyOverlay } from '../../components/spotify/SpotifyOverlay';
+import { SportSelectorBar } from '../../components/sport/SportSelectorBar';
 import * as Haptics from '../../lib/haptics';
 import { supabase } from '../../lib/supabase';
 
@@ -712,6 +713,7 @@ export default function TabsLayout() {
       {/* Overlays globales - aquí tienen contexto de navegación */}
       <HankOverlay />
       <SpotifyOverlay />
+      <SportSelectorBar />
     </View>
   );
 }

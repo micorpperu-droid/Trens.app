@@ -71,12 +71,12 @@ const MODULE_CONFIG: Record<ModuleId, ModuleConfig> = {
   },
   gym: {
     id: 'gym',
-    name: 'GYM',
+    name: 'SPORT',
     tagline: 'Diseña tu rutina de alto rendimiento',
     description:
       'Constructor de rutinas con más de 500 ejercicios, series configurables por tipo, cardio blocks, doble sesión por día y seguimiento completo de tu progreso.',
     accentColor: '#DC2626',
-    MainIcon: Dumbbell,
+    MainIcon: Zap,
     features: [
       { icon: Dumbbell, label: '+500 ejercicios con demo en video' },
       { icon: Target, label: 'Series: calentamiento, aproximación, efectiva' },

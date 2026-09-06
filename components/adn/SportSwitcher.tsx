@@ -34,8 +34,9 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { useSport, Sport } from '../../context/SportContext';
 import { Alert } from '../../lib/alert';
 
-// Deportes disponibles actualmente (los demás están "próximamente")
-const AVAILABLE_SPORTS = ['GYM'];
+// Deportes disponibles: los 4 ya tienen estructura funcional en el tab Sport
+// (GYM: rutinas: MOTO/AUTO/SURF: Equipo + Lugares)
+const AVAILABLE_SPORTS = ['GYM', 'MOTO', 'AUTO', 'SURF'];
 
 // ============================================================================
 // MAPA DE ICONOS POR DEPORTE

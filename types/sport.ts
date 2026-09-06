@@ -2,6 +2,8 @@
 // TRENS: TIPOS DEL SISTEMA DE DEPORTES
 // ============================================================================
 
+import type { Weekday } from '../lib/weekday';
+
 // ============================================================================
 // DEPORTES
 // ============================================================================
@@ -54,6 +56,9 @@ export interface InventoryItem {
   model?: string;
   year?: number;
   photo_url?: string;
+  video_url?: string;
+  media_type?: 'PHOTO' | 'VIDEO';
+  notes?: string;
   attributes: Record<string, any>;
   is_primary: boolean;
   status: 'ACTIVE' | 'SOLD' | 'BROKEN' | 'STORED';
@@ -61,6 +66,64 @@ export interface InventoryItem {
   last_service_date?: string;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Equipment (foto/video 16:9, nombre, notas/specs) reutiliza InventoryItem tal cual:
+ * category_code = 'EQUIPMENT', sport_id = el deporte seleccionado (GYM/MOTO/AUTO/SURF).
+ * `media_type` + `photo_url`/`video_url` cubren el media 16:9, `notes` las especificaciones.
+ * No requiere tabla ni tipo nuevo.
+ */
+export type Equipment = InventoryItem;
+
+// ============================================================================
+// UBICACIÓN (LOCATION) + HORARIO (SCHEDULE)
+// ============================================================================
+
+/** Horario de un día de la semana para una ubicación (apertura/cierre) */
+export interface ScheduleEntry {
+  weekday: Weekday; // 0=Dom..6=Sáb (lib/weekday.ts)
+  open_time?: string; // "HH:MM"
+  close_time?: string; // "HH:MM"
+  closed?: boolean; // true = cerrado ese día
+}
+
+export interface SportLocation {
+  id: string;
+  user_id: string;
+  sport_id: string;
+  name: string; // "Smart Fit - San Isidro"
+  photo_url?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  maps_url?: string; // link directo a Google/Apple Maps
+  notes?: string; // especificaciones/notas del lugar
+  schedule?: ScheduleEntry[]; // horario embebido (máx. 7 entradas, una por día)
+  is_primary: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// GALERÍA (SPORT GALLERY)
+// ============================================================================
+
+export type SportGalleryMediaType = 'PHOTO' | 'VIDEO';
+
+export interface SportGalleryItem {
+  id: string;
+  user_id: string;
+  sport_id: string;
+  location_id?: string; // opcional: asociar la foto/video a una ubicación
+  media_type: SportGalleryMediaType;
+  media_url: string;
+  thumbnail_url?: string; // requerido para VIDEO
+  cloudflare_video_id?: string; // si el video usa Cloudflare Stream
+  aspect_ratio: '9:16';
+  note?: string;
+  taken_at: string; // fecha mostrada al usuario (editable)
+  created_at: string;
 }
 
 // ============================================================================
@@ -112,6 +175,14 @@ export interface SportEvent {
   checklist?: ChecklistItem[];
   photo_urls?: string[];
   video_urls?: string[];
+  // Campos de la tarjeta simple del timeline CEO (Hora, Maps, Texto, media)
+  event_time?: string; // "HH:MM"
+  maps_url?: string;
+  latitude?: number;
+  longitude?: number;
+  notes?: string;
+  media_url?: string;
+  media_type?: 'PHOTO' | 'VIDEO';
   created_at: string;
   updated_at: string;
 }
@@ -205,7 +276,7 @@ export interface TabConfig {
 
 export const SPORT_TAB_CONFIGS: Record<SportCode, TabConfig> = {
   GYM: {
-    tab4: { name: 'GYM', icon: 'Dumbbell', route: 'gym' },
+    tab4: { name: 'SPORT', icon: 'Zap', route: 'gym' },
     tab5: { name: 'CEO', icon: 'Utensils', route: 'plan' },
     color: '#DC2626',
   },
