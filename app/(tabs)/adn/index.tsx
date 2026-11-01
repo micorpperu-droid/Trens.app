@@ -1762,7 +1762,7 @@ function AdnScreenContent() {
 
 export default function AdnScreen() {
   return (
-    <PWAGuard moduleName="PRIME">
+    <PWAGuard moduleName="CEO">
       <AdnScreenContent />
     </PWAGuard>
   );

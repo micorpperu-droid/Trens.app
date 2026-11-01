@@ -56,7 +56,7 @@ interface ModuleConfig {
 const MODULE_CONFIG: Record<ModuleId, ModuleConfig> = {
   adn: {
     id: 'adn',
-    name: 'PRIME',
+    name: 'CEO',
     tagline: 'Tu perfil atlético completo',
     description:
       'Registra tu composición corporal, récords personales, fotos de progreso y macros diarios. Tu identidad como atleta, toda en un solo lugar.',
@@ -86,11 +86,11 @@ const MODULE_CONFIG: Record<ModuleId, ModuleConfig> = {
   },
   plan: {
     id: 'plan',
-    name: 'CEO',
+    name: 'HOY',
     tagline: 'Tu agenda metabólica completa',
     description:
       'Planifica comidas por horario con ingredientes exactos, macros calculados automáticamente, stack de suplementos y lista de compras generada al instante.',
-    accentColor: '#22C55E',
+    accentColor: '#DC2626',
     MainIcon: Form,
     features: [
       { icon: Utensils, label: 'Comidas por horario con ingredientes' },

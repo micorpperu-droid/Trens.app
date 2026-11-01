@@ -10,7 +10,7 @@ import { GuestModuleLanding } from '../../../components/auth/GuestModuleLanding'
 import { useUserRoleContext } from '../../../context/UserRoleContext';
 import { Alert } from '../../../lib/alert';
 import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
-import { Plus, Pill, ShoppingBag, StickyNote, Flame, Layers } from 'lucide-react-native';
+import { Plus, Flame, Layers } from 'lucide-react-native';
 import * as Haptics from '../../../lib/haptics';
 import { useRouter, useFocusEffect } from 'expo-router';
 
@@ -28,6 +28,8 @@ import { hankToolsEvent } from '../../../lib/hankToolsEvent';
 import { PlanNotesModal } from '../../../components/plan/PlanNotesModal';
 import { AddCardioModal, AddCardioData } from '../../../components/plan/AddCardioModal';
 import { EventTimelineCard, TimelineEventData } from '../../../components/plan/EventTimelineCard';
+import { TaskTimelineCard, TimelineTaskData } from '../../../components/plan/TaskTimelineCard';
+import { localDateISO } from '../../../components/notes/taskTypes';
 import { supabase } from '../../../lib/supabase';
 import { useHank } from '../../../context/HankContext';
 import { useSaveGuard } from '../../_layout';
@@ -112,8 +114,8 @@ interface WorkoutBlockData {
 }
 
 interface TimelineItem {
-  type: 'meal' | 'stack' | 'workout' | 'cardio' | 'event';
-  data: Meal | Stack | WorkoutBlockData | CardioBlock | TimelineEventData;
+  type: 'meal' | 'stack' | 'workout' | 'cardio' | 'event' | 'task';
+  data: Meal | Stack | WorkoutBlockData | CardioBlock | TimelineEventData | TimelineTaskData;
   time?: string;
 }
 
@@ -286,7 +288,7 @@ function Tab5RouterContent() {
 
 export default function Tab5Router() {
   return (
-    <PWAGuard moduleName="CEO">
+    <PWAGuard moduleName="HOY">
       <Tab5RouterContent />
     </PWAGuard>
   );
@@ -315,7 +317,7 @@ function PlanScreen() {
   );
 
   // State
-  const [planName, setPlanName] = useState('MI PLAN');
+  const [, setPlanName] = useState('HOY');
   const [meals, setMeals] = useState<Meal[]>([]);
   const [stackItems, setStackItems] = useState<StackItem[]>([]);
   const [workoutPosIndex, setWorkoutPosIndex] = useState(2);
@@ -379,6 +381,7 @@ function PlanScreen() {
 
   // Eventos del deporte (agendados desde la sección Sport) para el día de hoy
   const [sportEvents, setSportEvents] = useState<TimelineEventData[]>([]);
+  const [timelineTasks, setTimelineTasks] = useState<TimelineTaskData[]>([]);
 
   // Workout time estimation - calcula dinámicamente basándose en posición del bloque
   const [workoutTimeEstimate, setWorkoutTimeEstimate] = useState<WorkoutTimeEstimate>({
@@ -411,7 +414,7 @@ function PlanScreen() {
 
       // Si no hay usuario, mostrar vista vacía
       if (!user) {
-        setPlanName('MI PLAN');
+        setPlanName('HOY');
         setMeals([]);
         setStackItems([]);
         setTodayRoutine('SIN RUTINA');
@@ -422,7 +425,7 @@ function PlanScreen() {
       }
 
       // Ya no usamos nutrition_plans, directamente cargamos meals
-      setPlanName('MI PLAN');
+      setPlanName('HOY');
 
       // Fetch meals - columnas reales de la tabla meals
       // Fetch meals con sus opciones (alternativas)
@@ -585,7 +588,7 @@ function PlanScreen() {
 
       // Fetch eventos del deporte agendados para HOY (sport_events, alimenta la
       // tarjeta genérica del timeline — se crean desde la sección Sport)
-      const todayISO = new Date().toISOString().split('T')[0];
+      const todayISO = localDateISO();
       const { data: eventsData } = await supabase
         .from('sport_events')
         .select(
@@ -595,6 +598,19 @@ function PlanScreen() {
         .eq('event_date', todayISO);
 
       setSportEvents((eventsData as TimelineEventData[]) || []);
+
+      // Tareas de hoy (módulo NOTAS): con hora, o asignadas desde un día anterior.
+      // Las creadas hoy sin hora se quedan solo en NOTAS.
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const { data: tasksData } = await supabase
+        .from('user_tasks')
+        .select('id, content, due_time, is_done')
+        .eq('user_id', user.id)
+        .eq('task_date', localDateISO())
+        .or(`due_time.not.is.null,created_at.lt.${startOfToday.toISOString()}`);
+
+      setTimelineTasks((tasksData as TimelineTaskData[]) || []);
 
       // Fetch workout block position (both sessions)
       const { data: posData, error: posError } = await supabase
@@ -1195,6 +1211,20 @@ function PlanScreen() {
     setCardioBlocks((prev) =>
       prev.map((c) => (c.id === cardioId ? { ...c, is_completed: completed } : c))
     );
+  };
+
+  const handleToggleTask = async (task: TimelineTaskData) => {
+    const next = !task.is_done;
+    setTimelineTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, is_done: next } : t)));
+    const { error } = await supabase
+      .from('user_tasks')
+      .update({ is_done: next, updated_at: new Date().toISOString() })
+      .eq('id', task.id);
+    if (error) {
+      setTimelineTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, is_done: task.is_done } : t))
+      );
+    }
   };
 
   const handleDeleteSportEvent = async (eventId: string) => {
@@ -1845,6 +1875,11 @@ function PlanScreen() {
         data: e,
         time: e.event_time || '00:00',
       })),
+      ...timelineTasks.map((t) => ({
+        type: 'task' as const,
+        data: t,
+        time: t.due_time || '00:00',
+      })),
     ].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
     // Insert workout block A at position
@@ -2122,8 +2157,8 @@ function PlanScreen() {
         style={{
           backgroundColor: '#000000',
           borderBottomWidth: 1,
-          borderBottomColor: 'rgba(34, 197, 94, 0.3)',
-          shadowColor: '#22C55E',
+          borderBottomColor: 'rgba(220, 38, 38, 0.3)',
+          shadowColor: '#DC2626',
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.15,
           shadowRadius: 12,
@@ -2133,141 +2168,35 @@ function PlanScreen() {
         <View
           className="absolute top-0 left-0 right-0 h-[2px]"
           style={{
-            backgroundColor: '#22C55E',
-            shadowColor: '#22C55E',
+            backgroundColor: '#DC2626',
+            shadowColor: '#DC2626',
             shadowOffset: { width: 0, height: 0 },
             shadowOpacity: 0.8,
             shadowRadius: 6,
           }}
         />
 
-        <View className="flex-row justify-between items-start">
-          <View className="flex-1">
-            <Text className="text-zinc-600 text-[10px] tracking-[4px] uppercase mb-1 font-bold">
-              AGENDA METABÓLICA
-            </Text>
-            <View className="flex-row items-center gap-2">
-              <View
-                className="w-2 h-2 rounded-full"
-                style={{
-                  backgroundColor: '#22C55E',
-                  shadowColor: '#22C55E',
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 1,
-                  shadowRadius: 4,
-                }}
-              />
-              <Text
-                className="text-white text-2xl font-black tracking-tight uppercase"
-                style={{
-                  textShadowColor: 'rgba(34, 197, 94, 0.5)',
-                  textShadowOffset: { width: 0, height: 0 },
-                  textShadowRadius: 12,
-                }}
-              >
-                {planName}
-              </Text>
-            </View>
-          </View>
-
-          {/* Action Buttons */}
-          <View className="flex-row gap-2">
-            {/* Tienda Button - Abre ShopModal */}
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                hankToolsEvent.open('shop');
-              }}
-              className="items-center px-3 py-2.5 rounded-xl active:scale-95"
-              style={{
-                backgroundColor: 'rgba(220, 38, 38, 0.08)',
-                borderWidth: 1.5,
-                borderColor: 'rgba(220, 38, 38, 0.4)',
-                shadowColor: '#DC2626',
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.3,
-                shadowRadius: 12,
-              }}
-            >
-              <View
-                className="w-8 h-8 rounded-full items-center justify-center"
-                style={{ backgroundColor: 'rgba(220, 38, 38, 0.2)' }}
-              >
-                <ShoppingBag size={14} color="#DC2626" />
-              </View>
-              <Text className="text-red-500 text-[9px] font-bold tracking-widest mt-1">
-                TRENS SHOP
-              </Text>
-            </Pressable>
-
-            {/* Stack Button Premium */}
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setStackManagerInitialView('list');
-                setShowStackManager(true);
-              }}
-              className="items-center px-3 py-2.5 rounded-xl active:scale-95"
-              style={{
-                backgroundColor: 'rgba(168, 85, 247, 0.08)',
-                borderWidth: 1.5,
-                borderColor: 'rgba(168, 85, 247, 0.4)',
-                shadowColor: '#A855F7',
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.3,
-                shadowRadius: 12,
-              }}
-            >
-              <View
-                className="w-8 h-8 rounded-full items-center justify-center"
-                style={{ backgroundColor: 'rgba(168, 85, 247, 0.2)' }}
-              >
-                <Pill size={14} color="#A855F7" />
-              </View>
-              <Text className="text-purple-400 text-[9px] font-bold tracking-widest mt-1">
-                STACK
-              </Text>
-              {stackItems.length > 0 && (
-                <Text className="text-purple-500/60 text-[8px] font-mono">{stackItems.length}</Text>
-              )}
-            </Pressable>
-
-            {/* Notes / Pizarra Button */}
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setShowPlanNotes(true);
-              }}
-              className="items-center px-3 py-2.5 rounded-xl active:scale-95"
-              style={{
-                backgroundColor: 'rgba(234, 179, 8, 0.08)',
-                borderWidth: 1.5,
-                borderColor: 'rgba(234, 179, 8, 0.4)',
-                shadowColor: '#EAB308',
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.3,
-                shadowRadius: 12,
-              }}
-            >
-              <View
-                className="w-8 h-8 rounded-full items-center justify-center"
-                style={{ backgroundColor: 'rgba(234, 179, 8, 0.2)' }}
-              >
-                <StickyNote size={14} color="#EAB308" />
-              </View>
-              <Text className="text-yellow-400 text-[9px] font-bold tracking-widest mt-1">
-                NOTAS
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Daily Stats Badges */}
-        <View className="flex-row flex-wrap gap-3 mt-3">
-          <View className="flex-row items-center gap-1">
-            <View className="w-1.5 h-1.5 rounded-full bg-green-500" />
-            <Text className="text-zinc-500 text-[10px] font-mono">{meals.length} COMIDAS</Text>
-          </View>
+        <View className="flex-row items-center gap-2">
+          <View
+            className="w-2 h-2 rounded-full"
+            style={{
+              backgroundColor: '#DC2626',
+              shadowColor: '#DC2626',
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 1,
+              shadowRadius: 4,
+            }}
+          />
+          <Text
+            className="text-white text-2xl font-black tracking-tight uppercase"
+            style={{
+              textShadowColor: 'rgba(220, 38, 38, 0.5)',
+              textShadowOffset: { width: 0, height: 0 },
+              textShadowRadius: 12,
+            }}
+          >
+            HOY
+          </Text>
         </View>
       </View>
 
@@ -2277,7 +2206,7 @@ function PlanScreen() {
         className="flex-1 px-5"
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22C55E" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#DC2626" />
         }
       >
         <View className="pt-6 gap-2 relative">
@@ -2286,8 +2215,8 @@ function PlanScreen() {
             <View
               className="absolute left-[18px] top-0 bottom-0 w-[2.5px] rounded-full"
               style={{
-                backgroundColor: 'rgba(34, 197, 94, 0.25)',
-                shadowColor: '#22C55E',
+                backgroundColor: 'rgba(220, 38, 38, 0.25)',
+                shadowColor: '#DC2626',
                 shadowOffset: { width: 0, height: 0 },
                 shadowOpacity: 0.4,
                 shadowRadius: 6,
@@ -2301,12 +2230,12 @@ function PlanScreen() {
               <View
                 className="w-20 h-20 rounded-2xl items-center justify-center mb-4"
                 style={{
-                  backgroundColor: 'rgba(34, 197, 94, 0.12)',
+                  backgroundColor: 'rgba(220, 38, 38, 0.12)',
                   borderWidth: 1,
-                  borderColor: 'rgba(34, 197, 94, 0.25)',
+                  borderColor: 'rgba(220, 38, 38, 0.25)',
                 }}
               >
-                <Plus size={32} color="#22C55E" />
+                <Plus size={32} color="#DC2626" />
               </View>
               <Text className="text-white font-bold text-lg mb-1">Sin comidas configuradas</Text>
               <Text className="text-zinc-400 text-sm text-center font-mono max-w-[240px]">
@@ -2402,6 +2331,18 @@ function PlanScreen() {
                 );
               }
 
+              if (item.type === 'task') {
+                const task = item.data as TimelineTaskData;
+                return (
+                  <View
+                    key={`task-${task.id}`}
+                    onLayout={(e) => handleItemLayout(timelineIndex, e.nativeEvent.layout.y)}
+                  >
+                    <TaskTimelineCard task={task} onToggle={handleToggleTask} />
+                  </View>
+                );
+              }
+
               if (item.type === 'event') {
                 const sportEvent = item.data as TimelineEventData;
                 return (
@@ -2430,8 +2371,8 @@ function PlanScreen() {
             backgroundColor: 'rgba(39, 39, 42, 0.4)',
             borderWidth: 1.5,
             borderStyle: 'dashed',
-            borderColor: 'rgba(34, 197, 94, 0.4)',
-            shadowColor: '#22C55E',
+            borderColor: 'rgba(220, 38, 38, 0.4)',
+            shadowColor: '#DC2626',
             shadowOffset: { width: 0, height: 0 },
             shadowOpacity: 0.15,
             shadowRadius: 24,
@@ -2440,11 +2381,11 @@ function PlanScreen() {
           <View className="items-center">
             <View
               className="w-12 h-12 rounded-xl items-center justify-center mb-2"
-              style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)' }}
+              style={{ backgroundColor: 'rgba(220, 38, 38, 0.15)' }}
             >
-              <Plus size={24} color="#22C55E" />
+              <Plus size={24} color="#DC2626" />
             </View>
-            <Text className="text-green-500 font-bold tracking-widest text-sm">AGREGAR COMIDA</Text>
+            <Text className="text-red-500 font-bold tracking-widest text-sm">AGREGAR COMIDA</Text>
             <Text className="text-zinc-500 text-[10px] font-mono mt-1">
               Nueva comida en tu plan
             </Text>

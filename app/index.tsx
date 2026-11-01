@@ -42,7 +42,7 @@ export default function Index() {
     if (isShopSubdomain) return <Redirect href={'/shop' as Href} />;
     if (isAuthenticated) {
       if (isAdmin) return <Redirect href={'/(admin)/usuarios' as Href} />;
-      return <Redirect href={'/(tabs)/feed' as Href} />;
+      return <Redirect href={'/(tabs)/adn' as Href} />;
     }
     // Mostrar landing inmediatamente — sin esperar 8s de auth
     return <LandingPage />;
@@ -64,10 +64,10 @@ export default function Index() {
     // En PWA autenticado: ir a la app según rol
     if (isAuthenticated) {
       if (isAdmin) return <Redirect href={'/(admin)/usuarios' as Href} />;
-      return <Redirect href={'/(tabs)/feed' as Href} />;
+      return <Redirect href={'/(tabs)/adn' as Href} />;
     }
     // Invitado en PWA: ir al feed (puede explorar sin cuenta)
-    return <Redirect href={'/(tabs)/feed' as Href} />;
+    return <Redirect href={'/(tabs)/adn' as Href} />;
   }
 
   // ============================================================================
@@ -75,8 +75,8 @@ export default function Index() {
   // ============================================================================
   if (isAuthenticated) {
     if (isAdmin) return <Redirect href={'/(admin)/usuarios' as Href} />;
-    return <Redirect href={'/(tabs)/feed' as Href} />;
+    return <Redirect href={'/(tabs)/adn' as Href} />;
   }
   // Invitado nativo: ir al feed
-  return <Redirect href={'/(tabs)/feed' as Href} />;
+  return <Redirect href={'/(tabs)/adn' as Href} />;
 }

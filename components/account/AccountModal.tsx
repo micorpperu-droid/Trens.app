@@ -46,9 +46,7 @@ import {
   Zap,
   Plus,
   Star,
-  Play,
   ShieldUser,
-  Crosshair,
   Form,
   Dumbbell,
   ShieldAlert,
@@ -213,7 +211,7 @@ export default function AccountModal({
   const [isSavingPersonal, setIsSavingPersonal] = useState(false);
 
   // Default module preference
-  const [defaultModule, setDefaultModule] = useState<DefaultModule>('feed');
+  const [defaultModule, setDefaultModule] = useState<DefaultModule>('adn');
   const [isSavingModule, setIsSavingModule] = useState(false);
 
   const DEFAULT_MODULE_OPTIONS: Array<{
@@ -224,27 +222,14 @@ export default function AccountModal({
     iconFill?: boolean;
   }> = [
     {
-      key: 'feed',
-      label: 'TRENS',
-      subtitle: 'Feed de videos',
-      Icon: Play,
-      iconFill: true,
-    },
-    {
       key: 'adn',
-      label: 'PRIME',
+      label: 'CEO',
       subtitle: 'Perfil atlético',
       Icon: ShieldUser,
     },
     {
-      key: 'pro',
-      label: 'PRO',
-      subtitle: 'Cámara y editor',
-      Icon: Crosshair,
-    },
-    {
       key: 'plan',
-      label: 'CEO',
+      label: 'HOY',
       subtitle: 'Timeline metabólico',
       Icon: Form,
     },

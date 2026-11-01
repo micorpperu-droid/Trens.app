@@ -841,7 +841,7 @@ export function SpotifyOverlay() {
         gym: 'el módulo de Entrenamiento',
         plan: 'el módulo de Nutrición',
         pro: 'el módulo PRO de Análisis',
-        adn: 'el módulo de PRIME (Perfil Físico)',
+        adn: 'el módulo CEO (Perfil Físico)',
       };
 
       const moduleName = moduleNames[screenContext.module] || screenContext.module;

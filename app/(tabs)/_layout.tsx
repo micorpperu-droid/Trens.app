@@ -17,6 +17,8 @@ import {
   Sailboat,
   Waves,
   Camera,
+  StickyNote,
+  CalendarDays,
   LucideIcon,
 } from 'lucide-react-native';
 import Animated, {
@@ -94,7 +96,52 @@ function TabIcon({
   );
 }
 
-// Componente para el icono PRO con indicadores dinámicos
+// Mismo botón circular con mira que tenía PRO, sin captura
+function CenterTabIcon({ focused }: { focused: boolean }) {
+  return (
+    <View style={{ alignItems: 'center', overflow: 'visible' }} pointerEvents="box-none">
+      <View
+        style={{
+          padding: focused ? 4 : 16,
+          borderRadius: 999,
+          backgroundColor: focused ? '#FFFFFF' : ED_HARDY.zinc800,
+          marginBottom: 20,
+          alignItems: 'center',
+          justifyContent: 'center',
+          ...(Platform.OS !== 'web'
+            ? {
+                shadowColor: focused ? ED_HARDY.neonRed : 'transparent',
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: focused ? 0.8 : 0,
+                shadowRadius: 15,
+                elevation: focused ? 15 : 0,
+              }
+            : {}),
+        }}
+      >
+        {focused ? (
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: '#FFFFFF',
+              margin: 2,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Crosshair color={ED_HARDY.black} size={26} strokeWidth={2.5} />
+          </View>
+        ) : (
+          <Crosshair color="#FFFFFF" size={28} strokeWidth={2.5} />
+        )}
+      </View>
+    </View>
+  );
+}
+
+// Reservado: botón central de cámara PRO, hoy oculto de la barra
 function ProTabIcon({ focused }: { focused: boolean }) {
   const { isRecording, recordingTime, captureMode, setCaptureMode } = useProRecording();
 
@@ -307,24 +354,23 @@ function ProTabIcon({ focused }: { focused: boolean }) {
 }
 
 // ============================================================================
-// INITIAL ROUTE: Feed (TRENS) se abre primero
+// INITIAL ROUTE: CEO (antes PRIME) se abre primero; TRENS (feed) está inactivo
 // ============================================================================
 export const unstable_settings = {
-  initialRouteName: 'feed/index',
+  initialRouteName: 'adn/index',
 };
 
 // ============================================================================
 // TAB ORDER - Todos los tabs permiten swipe horizontal
 // ============================================================================
-const TAB_ROUTES = ['feed', 'adn', 'pro', 'plan', 'gym'] as const;
-const SWIPEABLE_TABS = ['feed', 'adn', 'pro', 'plan', 'gym'] as const;
+const TAB_ROUTES = ['adn', 'mes', 'plan', 'notas', 'gym'] as const;
+const SWIPEABLE_TABS = ['adn', 'mes', 'plan', 'notas', 'gym'] as const;
 
 export default function TabsLayout() {
   const { user, loading } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { isRecording, startRecording, stopRecording, takePhoto, captureMode } = useProRecording();
   const defaultModuleApplied = useRef(false);
 
   // -------------------------------------------------------------------------
@@ -347,15 +393,15 @@ export default function TabsLayout() {
 
         const defaultModule = data?.default_module;
         const moduleRouteMap: Record<string, string> = {
-          feed: '/(tabs)/feed',
+          feed: '/(tabs)/adn', // TRENS inactivo
           adn: '/(tabs)/adn',
-          pro: '/(tabs)/pro',
+          pro: '/(tabs)/plan', // PRO oculto: redirige al timeline
           plan: '/(tabs)/plan',
           gym: '/(tabs)/gym',
         };
 
         const targetRoute = defaultModule ? moduleRouteMap[defaultModule] : null;
-        if (targetRoute && targetRoute !== '/(tabs)/feed') {
+        if (targetRoute && targetRoute !== '/(tabs)/adn') {
           router.replace(targetRoute as any);
         }
       } catch (err) {
@@ -372,9 +418,6 @@ export default function TabsLayout() {
 
   // Iconos dinámicos para tabs 4 y 5
   const Tab4Icon = getIconComponent(tabConfig.tab4.icon);
-  const Tab5Icon = getIconComponent(tabConfig.tab5.icon);
-  const isPlanTab = (tabConfig.tab5.name || '').trim().toUpperCase() === 'CEO';
-  const PlanTabIcon = isPlanTab ? Form : Tab5Icon;
   const sportColor = tabConfig.color;
 
   // Altura dinámica del tab bar basada en safe area
@@ -593,70 +636,44 @@ export default function TabsLayout() {
             ),
           }}
         >
-          {/* TRENS - Pantalla principal (TikTok-style feed) */}
-          <Tabs.Screen
-            name="feed/index"
-            options={{
-              title: 'TRENS',
-              tabBarIcon: ({ color, focused }) => {
-                // Si estamos en profile, mostrar Feed como activo
-                const isProfileView = pathname?.includes('profile');
-                const effectiveFocused = focused || isProfileView;
-                const effectiveColor = effectiveFocused ? sportColor : color;
-                return (
-                  <TabIcon Icon={Zap} color={effectiveColor} size={26} fill={effectiveColor} />
-                );
-              },
-            }}
-          />
-
-          {/* PRIME - Perfil + Bóveda + Configuración */}
+          {/* CEO - Perfil + Bóveda + Configuración (antes PRIME) */}
           <Tabs.Screen
             name="adn/index"
             options={{
-              title: 'PRIME',
+              title: 'CEO',
               tabBarIcon: ({ color }) => <TabIcon Icon={ShieldUser} color={color} size={26} />,
             }}
           />
 
-          {/* PRO - Botón central de cámara con indicadores dinámicos */}
+          {/* MES - Calendario con tareas y eventos */}
           <Tabs.Screen
-            name="pro/index"
+            name="mes/index"
+            options={{
+              title: 'MES',
+              tabBarIcon: ({ color }) => <TabIcon Icon={CalendarDays} color={color} size={26} />,
+            }}
+          />
+
+          {/* HOY - Slot central: timeline del día */}
+          <Tabs.Screen
+            name="plan/index"
             options={{
               title: '',
-              tabBarIcon: ({ focused }) => <ProTabIcon focused={focused} />,
-              // Pressable unificado — maneja navegación Y captura/grabación
+              tabBarIcon: ({ focused }) => <CenterTabIcon focused={focused} />,
               tabBarButton: (props: any) => (
-                <Pressable
-                  onPress={() => {
-                    const isProActive = pathname?.includes('/pro');
-                    if (!isProActive) {
-                      router.push('/pro');
-                      return;
-                    }
-                    // Ya en PRO — ejecutar acción según modo
-                    if (captureMode === 'photo') {
-                      takePhoto();
-                    } else if (isRecording) {
-                      stopRecording();
-                    } else {
-                      startRecording();
-                    }
-                  }}
-                  style={[props.style, { overflow: 'visible' }]}
-                >
+                <Pressable onPress={props.onPress} style={[props.style, { overflow: 'visible' }]}>
                   {props.children}
                 </Pressable>
               ),
             }}
           />
 
-          {/* PLAN/TRACK/WAVES - Dinámico según deporte */}
+          {/* NOTAS - Notas simples con color y título opcional */}
           <Tabs.Screen
-            name="plan/index"
+            name="notas/index"
             options={{
-              title: tabConfig.tab5.name,
-              tabBarIcon: ({ color }) => <TabIcon Icon={PlanTabIcon} color={color} size={26} />,
+              title: 'NOTAS',
+              tabBarIcon: ({ color }) => <TabIcon Icon={StickyNote} color={color} size={26} />,
             }}
           />
 
@@ -667,6 +684,22 @@ export default function TabsLayout() {
               title: tabConfig.tab4.name,
               tabBarIcon: ({ color }) => <TabIcon Icon={Tab4Icon} color={color} size={26} />,
               lazy: false,
+            }}
+          />
+
+          {/* TRENS (feed) inactivo, reservado para uso futuro */}
+          <Tabs.Screen
+            name="feed/index"
+            options={{
+              href: null,
+            }}
+          />
+
+          {/* PRO (cámara) reservado y oculto para uso futuro */}
+          <Tabs.Screen
+            name="pro/index"
+            options={{
+              href: null,
             }}
           />
 

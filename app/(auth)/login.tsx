@@ -306,7 +306,7 @@ export default function LoginScreen() {
         }
       }
 
-      router.replace('/(tabs)/feed');
+      router.replace('/(tabs)/adn');
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -323,7 +323,7 @@ export default function LoginScreen() {
       const result = await signInWithApple();
       if (result.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.replace('/(tabs)/feed');
+        router.replace('/(tabs)/adn');
       } else if (result.error && result.error !== 'cancelled') {
         setError(result.error);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

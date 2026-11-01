@@ -16,6 +16,9 @@ import {
   Volume2,
   VolumeX,
   GitlabIcon,
+  CalendarClock,
+  Check,
+  MapPin,
 } from 'lucide-react-native';
 import { router, useFocusEffect } from 'expo-router';
 import * as Speech from 'expo-speech';
@@ -25,6 +28,7 @@ import { hankSpeakState } from '../../lib/hankSpeakState';
 import { hankSpeakActions } from '../../lib/hankSpeakAction';
 import { speakSavage, stopSavage, prefetchSavage } from '../../services/tts/savageTTS';
 import { setHankChatOpen } from '../../lib/hankChatState';
+import { localDateISO } from '../notes/taskTypes';
 
 // ============================================================================
 // TYPES
@@ -64,7 +68,7 @@ interface WorkoutStackItem {
 }
 
 // Unified timeline item
-type TimelineItemType = 'meal' | 'workout' | 'stack' | 'cardio';
+type TimelineItemType = 'meal' | 'workout' | 'stack' | 'cardio' | 'task' | 'event';
 type TimelineUrgency = 'now' | 'soon' | 'normal' | 'far';
 
 interface TimelineItem {
@@ -162,6 +166,8 @@ const IN_PROGRESS_WINDOW: Record<TimelineItemType, number> = {
   cardio: 60,
   meal: 45,
   stack: 20,
+  task: 30,
+  event: 90,
 };
 // Horas hacia adelante para la ventana inicial.
 const SMART_WINDOW_HOURS = 6;
@@ -723,6 +729,152 @@ const CardioTimelineCard: React.FC<{
   );
 };
 
+// --- TASK CARD ---
+const TaskRowCard: React.FC<{
+  item: TimelineItem;
+  isNext: boolean;
+  countdown: string;
+  onComplete: (taskId: string) => void;
+}> = ({ item, isNext, countdown, onComplete }) => {
+  const accent = '#DC2626';
+  const untimed = item.time === '99:99';
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        router.push('/(tabs)/plan');
+      }}
+      className="rounded-xl p-3 active:scale-[0.98]"
+      style={{
+        backgroundColor: isNext ? '#0a0505' : '#0a0a0a',
+        borderWidth: 1,
+        borderColor: isNext ? `${accent}50` : '#27272a40',
+      }}
+    >
+      <View className="flex-row items-center justify-between">
+        <View className="flex-row items-center gap-2.5 flex-1">
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onComplete(item.data.id);
+            }}
+            hitSlop={10}
+            className="w-8 h-8 rounded-full items-center justify-center"
+            style={{ borderWidth: 2, borderColor: accent }}
+          >
+            <Check size={13} color={accent} strokeWidth={3} />
+          </Pressable>
+          <View className="flex-1">
+            <Text
+              className="text-[10px] font-bold uppercase tracking-widest"
+              style={{ color: isNext ? accent : '#71717a' }}
+            >
+              TAREA
+            </Text>
+            <Text className="text-white font-bold text-sm" numberOfLines={2}>
+              {item.data.content}
+            </Text>
+          </View>
+        </View>
+
+        {!untimed && (
+          <View className="items-end">
+            <View className="flex-row items-center gap-1">
+              <Clock size={9} color={isNext ? accent : '#52525b'} />
+              <Text
+                className="text-[10px] font-mono font-bold"
+                style={{ color: isNext ? accent : '#52525b' }}
+              >
+                {formatTime12h(item.time)}
+              </Text>
+            </View>
+            <Text
+              className="text-[9px] font-bold"
+              style={{ color: countdown === 'AHORA' ? accent : '#52525b' }}
+            >
+              {countdown}
+            </Text>
+          </View>
+        )}
+      </View>
+    </Pressable>
+  );
+};
+
+// --- EVENT CARD ---
+const EventRowCard: React.FC<{
+  item: TimelineItem;
+  isNext: boolean;
+  countdown: string;
+}> = ({ item, isNext, countdown }) => {
+  const accent = '#0EA5E9';
+  const untimed = item.time === '99:99';
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        router.push('/(tabs)/plan');
+      }}
+      className="rounded-xl p-3 active:scale-[0.98]"
+      style={{
+        backgroundColor: isNext ? '#050a0f' : '#0a0a0a',
+        borderWidth: 1,
+        borderColor: isNext ? `${accent}50` : '#27272a40',
+      }}
+    >
+      <View className="flex-row items-center justify-between">
+        <View className="flex-row items-center gap-2.5 flex-1">
+          <View
+            className="w-8 h-8 rounded-full items-center justify-center"
+            style={{ backgroundColor: `${accent}20` }}
+          >
+            <CalendarClock size={13} color={accent} />
+          </View>
+          <View className="flex-1">
+            <Text
+              className="text-[10px] font-bold uppercase tracking-widest"
+              style={{ color: isNext ? accent : '#71717a' }}
+            >
+              EVENTO
+            </Text>
+            <Text className="text-white font-bold text-sm" numberOfLines={2}>
+              {item.data.text}
+            </Text>
+            {!!item.data.location && (
+              <View className="flex-row items-center gap-1 mt-0.5">
+                <MapPin size={9} color="#71717a" />
+                <Text className="text-zinc-500 text-[9px]" numberOfLines={1}>
+                  {item.data.location}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {!untimed && (
+          <View className="items-end">
+            <View className="flex-row items-center gap-1">
+              <Clock size={9} color={isNext ? accent : '#52525b'} />
+              <Text
+                className="text-[10px] font-mono font-bold"
+                style={{ color: isNext ? accent : '#52525b' }}
+              >
+                {formatTime12h(item.time)}
+              </Text>
+            </View>
+            <Text
+              className="text-[9px] font-bold"
+              style={{ color: countdown === 'AHORA' ? accent : '#52525b' }}
+            >
+              {countdown}
+            </Text>
+          </View>
+        )}
+      </View>
+    </Pressable>
+  );
+};
+
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -875,6 +1027,26 @@ export const TodayCards: React.FC<TodayCardsProps> = ({ userId }) => {
       const profileData = profileRes.data;
       const exerciseConfigs = exerciseConfigsRes.data;
       const workoutPositions = workoutPositionsRes.data;
+
+      // Tareas y eventos de hoy (módulos NOTAS y SPORT). Mismas reglas que HOY:
+      // tareas con hora, o asignadas desde un día anterior; las completadas no cuentan.
+      const todayISO = localDateISO(now);
+      const startOfToday = new Date(now);
+      startOfToday.setHours(0, 0, 0, 0);
+      const [tasksRes, eventsRes] = await Promise.all([
+        supabase
+          .from('user_tasks')
+          .select('id, content, due_time')
+          .eq('user_id', userId)
+          .eq('task_date', todayISO)
+          .eq('is_done', false)
+          .or(`due_time.not.is.null,created_at.lt.${startOfToday.toISOString()}`),
+        supabase
+          .from('sport_events')
+          .select('id, name, event_time, notes, location')
+          .eq('user_id', userId)
+          .eq('event_date', todayISO),
+      ]);
 
       // =====================================================================
       // 1. MEALS — filtra completadas hoy (mejora E)
@@ -1248,6 +1420,37 @@ export const TodayCards: React.FC<TodayCardsProps> = ({ userId }) => {
       // =====================================================================
       // 5. SMART WINDOW (mejora A + B + L)
       // =====================================================================
+      // =====================================================================
+      // 4b. TAREAS y EVENTOS de hoy. Sin hora: siempre visibles, al final.
+      // =====================================================================
+      const untimedForced: TimelineItem[] = [];
+      tasksRes.data?.forEach((t: any) => {
+        const timeStr: string | null = t.due_time ? String(t.due_time).slice(0, 5) : null;
+        const item: TimelineItem = {
+          id: `task-${t.id}`,
+          type: 'task',
+          time: timeStr || '99:99',
+          minutes: timeStr ? parseTimeToMinutes(timeStr) : 9999,
+          label: 'TAREA',
+          data: { id: t.id, content: t.content },
+        };
+        if (timeStr) items.push(item);
+        else untimedForced.push(item);
+      });
+      eventsRes.data?.forEach((e: any) => {
+        const timeStr: string | null = e.event_time ? String(e.event_time).slice(0, 5) : null;
+        const item: TimelineItem = {
+          id: `event-${e.id}`,
+          type: 'event',
+          time: timeStr || '99:99',
+          minutes: timeStr ? parseTimeToMinutes(timeStr) : 9999,
+          label: 'EVENTO',
+          data: { id: e.id, text: e.notes || e.name || 'Evento', location: e.location || '' },
+        };
+        if (timeStr) items.push(item);
+        else untimedForced.push(item);
+      });
+
       items.sort((a, b) => a.minutes - b.minutes);
 
       // Filtra items "ya pasados" usando ventana en-progreso por tipo (B)
@@ -1301,6 +1504,9 @@ export const TodayCards: React.FC<TodayCardsProps> = ({ userId }) => {
           void tomorrowDay;
         } catch {}
       }
+
+      // Tareas/eventos sin hora de hoy: siempre se muestran, al final
+      filtered = [...filtered, ...untimedForced.filter((u) => !filtered.some((f) => f.id === u.id))];
 
       // Asignar urgencia (mejora G)
       filtered = filtered.map((i) => ({
@@ -1422,6 +1628,21 @@ export const TodayCards: React.FC<TodayCardsProps> = ({ userId }) => {
               );
             }
           }
+          break;
+        }
+        case 'task': {
+          const when = item.time === '99:99' ? ' pendiente hoy' : ` a las ${timeLabel}`;
+          parts.push(
+            `Tarea${when}${item.time !== '99:99' && timeContext ? `, ${timeContext}` : ''}: ${item.data.content}.`
+          );
+          break;
+        }
+        case 'event': {
+          const when = item.time === '99:99' ? ' hoy' : ` a las ${timeLabel}`;
+          const where = item.data.location ? `, en ${item.data.location}` : '';
+          parts.push(
+            `Evento${when}${item.time !== '99:99' && timeContext ? `, ${timeContext}` : ''}: ${item.data.text}${where}.`
+          );
           break;
         }
         case 'cardio': {
@@ -1549,6 +1770,15 @@ export const TodayCards: React.FC<TodayCardsProps> = ({ userId }) => {
     return () => clearInterval(interval);
   }, [timeline, buildNarrationText]);
 
+  const handleCompleteTask = useCallback(async (taskId: string) => {
+    setTimeline((prev) => prev.filter((i) => i.id !== `task-${taskId}`));
+    const { error } = await supabase
+      .from('user_tasks')
+      .update({ is_done: true, updated_at: new Date().toISOString() })
+      .eq('id', taskId);
+    if (error) console.error('Error completando tarea:', error);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       fetchTodayData();
@@ -1611,7 +1841,7 @@ export const TodayCards: React.FC<TodayCardsProps> = ({ userId }) => {
             className="px-3 py-1.5 rounded-lg active:scale-95"
             style={{ backgroundColor: '#DC262615' }}
           >
-            <Text className="text-red-600 text-[10px] font-bold tracking-wider">VER PLAN</Text>
+            <Text className="text-red-600 text-[10px] font-bold tracking-wider">VER HOY</Text>
           </Pressable>
         </View>
       </View>
@@ -1646,7 +1876,9 @@ export const TodayCards: React.FC<TodayCardsProps> = ({ userId }) => {
                 ? '#a855f7'
                 : item.type === 'cardio'
                   ? getCardioColor((item.data as CardioItem)?.cardio_type || '')
-                  : '#DC2626';
+                  : item.type === 'event'
+                    ? '#0EA5E9'
+                    : '#DC2626';
           if (isUrgent) {
             dotColor = accent;
           } else if (isNext || isSoon) {
@@ -1749,6 +1981,17 @@ export const TodayCards: React.FC<TodayCardsProps> = ({ userId }) => {
                     isNext={isNext || isUrgent}
                     countdown={countdown}
                   />
+                )}
+                {item.type === 'task' && (
+                  <TaskRowCard
+                    item={item}
+                    isNext={isNext || isUrgent}
+                    countdown={countdown}
+                    onComplete={handleCompleteTask}
+                  />
+                )}
+                {item.type === 'event' && (
+                  <EventRowCard item={item} isNext={isNext || isUrgent} countdown={countdown} />
                 )}
               </View>
             </View>
