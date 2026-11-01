@@ -9,17 +9,13 @@ import Animated, {
   interpolate,
   Easing,
 } from 'react-native-reanimated';
-import { ChevronDown, X, Edit2, Save, ShieldAlert, Crown, Trash2 } from 'lucide-react-native';
+import { ChevronDown, X, Edit2, Save, ShieldAlert, Trash2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from '../../lib/haptics';
 import { supabase } from '../../lib/supabase';
 import { useSaveGuard } from '../../context/SaveGuardContext';
 import { useHankTarget } from '../../hooks/useHankTarget';
 import HankInlineHighlight from '../hank/HankInlineHighlight';
-import ProgressSlider from './ProgressSlider';
-import AddProgressPhotoModal from './AddProgressPhotoModal';
-import ProgressPhotoDetailModal from './ProgressPhotoDetailModal';
-import type { ProgressPhoto } from '../../types/progress';
 // Las sincronizaciones de macros fueron removidas — la app ya no registra macros
 
 interface Measurement {
@@ -35,6 +31,8 @@ interface ProfileData {
   height: string;
   injuries: string;
   allergies: string;
+  // IMC ingresado manualmente
+  bmi?: number;
   // Campos para personalización
   age?: number;
   sex?: string;
@@ -62,7 +60,6 @@ interface TrensIDProps {
   profileData: ProfileData;
   measurements: Measurement[];
   onUpdate: () => void;
-  focusKey?: number;
 }
 
 export default function TrensID({
@@ -70,7 +67,6 @@ export default function TrensID({
   profileData,
   measurements,
   onUpdate,
-  focusKey = 0,
 }: TrensIDProps) {
   const { canSave } = useSaveGuard();
   const { targetRef, onLayout, isHighlighted, animationPhase } = useHankTarget({
@@ -82,20 +78,9 @@ export default function TrensID({
   const [editData, setEditData] = useState<ProfileData>(profileData);
   const [editMeasurements, setEditMeasurements] = useState<Measurement[]>(measurements);
   const [showMeasureForm, setShowMeasureForm] = useState(false);
-  const [newMeasurement, setNewMeasurement] = useState({ name: '', value: '', is_dominant: false });
+  const [newMeasurement, setNewMeasurement] = useState({ name: '', value: '' });
   const [isSaving, setIsSaving] = useState(false);
-  // Progress Photos
-  const [showAddPhotoModal, setShowAddPhotoModal] = useState(false);
-  const [showPhotoDetailModal, setShowPhotoDetailModal] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState<ProgressPhoto | null>(null);
-  const [progressRefreshTrigger, setProgressRefreshTrigger] = useState(0);
-
-  // Recargar fotos de progreso cada vez que la pantalla ADN gana foco (botón o swipe)
-  useEffect(() => {
-    if (focusKey > 0) {
-      setProgressRefreshTrigger((prev) => prev + 1);
-    }
-  }, [focusKey]);
+  const [bmiText, setBmiText] = useState(profileData.bmi?.toString() ?? '');
 
   const expandProgress = useSharedValue(0);
   const idleBorderGlow = useSharedValue(0);
@@ -118,6 +103,7 @@ export default function TrensID({
   useEffect(() => {
     if (!isExpanded) {
       setEditData(profileData);
+      setBmiText(profileData.bmi?.toString() ?? '');
       setEditMeasurements(measurements);
     }
   }, [profileData, measurements, isExpanded]);
@@ -128,8 +114,6 @@ export default function TrensID({
       easing: Easing.bezier(0.25, 0.1, 0.25, 1),
     });
   }, [isExpanded]);
-
-  const dominantMuscle = editMeasurements.find((m) => m.is_dominant) || { name: 'N/A', value: '-' };
 
   const handleExpand = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -157,45 +141,19 @@ export default function TrensID({
           user_id: userId,
           name: newMeasurement.name.toUpperCase(),
           value: newMeasurement.value,
-          is_dominant: newMeasurement.is_dominant,
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      setEditMeasurements((prev) => {
-        let updated = [...prev];
-        if (newMeasurement.is_dominant) {
-          updated = updated.map((m) => ({ ...m, is_dominant: false }));
-        }
-        return [...updated, data];
-      });
+      setEditMeasurements((prev) => [...prev, data]);
 
-      setNewMeasurement({ name: '', value: '', is_dominant: false });
+      setNewMeasurement({ name: '', value: '' });
       setShowMeasureForm(false);
       onUpdate(); // Sincronizar padre
     } catch (err) {
       console.error('Error adding measurement:', err);
-    }
-  };
-
-  const toggleDominant = async (id: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    try {
-      // El trigger en Supabase se encarga de desactivar los otros
-      await supabase.from('body_measurements').update({ is_dominant: true }).eq('id', id);
-
-      setEditMeasurements((prev) =>
-        prev.map((m) => ({
-          ...m,
-          is_dominant: m.id === id,
-        }))
-      );
-      onUpdate(); // Sincronizar padre
-    } catch (err) {
-      console.error('Error toggling dominant:', err);
     }
   };
 
@@ -234,10 +192,14 @@ export default function TrensID({
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setIsSaving(true);
 
+    const bmiParsed = parseFloat(bmiText.replace(',', '.'));
+    const bmiValue = Number.isFinite(bmiParsed) && bmiParsed > 0 ? Math.round(bmiParsed * 10) / 10 : null;
+
     try {
       const { error } = await supabase
         .from('user_profiles')
         .update({
+          bmi: bmiValue,
           goal: editData.goal,
           weight: editData.weight,
           height: editData.height,
@@ -377,18 +339,6 @@ export default function TrensID({
                     </View>
                   </View>
 
-                  {/* Músculo Dominante */}
-                  <View className="w-1/2 items-end">
-                    <View className="flex-row items-center gap-1 mb-1">
-                      <Crown size={10} color="#eab308" />
-                      <Text className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
-                        Dominante
-                      </Text>
-                    </View>
-                    <Text className="text-white font-bold text-sm uppercase">
-                      {dominantMuscle.name} {dominantMuscle.value}
-                    </Text>
-                  </View>
                 </View>
 
                 {/* Hint para expandir */}
@@ -534,34 +484,19 @@ export default function TrensID({
                         placeholderTextColor="#52525b"
                       />
                     </View>
-                    {/* IMC - Calculado automáticamente */}
+                    {/* IMC - Editable manualmente */}
                     <View className="w-1/3 px-1 mb-3">
                       <Text className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider mb-1">
                         IMC
                       </Text>
-                      {(() => {
-                        const w = parseFloat(editData.weight);
-                        const hCm = parseFloat(editData.height);
-                        if (w > 0 && hCm > 0) {
-                          const hM = hCm > 3 ? hCm / 100 : hCm;
-                          const imc = (w / (hM * hM)).toFixed(1);
-                          return (
-                            <View className="bg-zinc-900 border border-zinc-700 p-3 rounded">
-                              <Text className="text-white text-xs font-mono font-bold text-center">
-                                {imc}
-                              </Text>
-                            </View>
-                          );
-                        }
-                        return (
-                          <View className="bg-zinc-900 border border-zinc-700 p-3 rounded">
-                            <Text className="text-zinc-600 text-xs font-mono font-bold text-center">
-                              -
-                            </Text>
-                          </View>
-                        );
-                      })()}
-                      <Text className="text-[7px] text-zinc-600 text-center mt-1">Auto</Text>
+                      <TextInput
+                        value={bmiText}
+                        onChangeText={setBmiText}
+                        keyboardType="decimal-pad"
+                        placeholder="22.5"
+                        className="bg-black border border-zinc-800 p-3 text-white text-xs font-bold"
+                        placeholderTextColor="#52525b"
+                      />
                     </View>
                     {/* Masa Muscular */}
                     <View className="w-1/2 px-1 mb-3">
@@ -716,33 +651,6 @@ export default function TrensID({
                       </View>
 
                       <TouchableOpacity
-                        onPress={() =>
-                          setNewMeasurement({
-                            ...newMeasurement,
-                            is_dominant: !newMeasurement.is_dominant,
-                          })
-                        }
-                        className="flex-row items-center gap-2 mb-3"
-                      >
-                        <View
-                          className={`w-5 h-5 border items-center justify-center ${
-                            newMeasurement.is_dominant
-                              ? 'bg-yellow-500 border-yellow-500'
-                              : 'border-zinc-600 bg-transparent'
-                          }`}
-                        >
-                          {newMeasurement.is_dominant && <Crown size={10} color="#000" />}
-                        </View>
-                        <Text
-                          className={`text-[10px] uppercase font-bold ${
-                            newMeasurement.is_dominant ? 'text-yellow-500' : 'text-zinc-500'
-                          }`}
-                        >
-                          Músculo Dominante 👑
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
                         onPress={handleAddMeasurement}
                         className="bg-white py-3 items-center"
                       >
@@ -758,24 +666,11 @@ export default function TrensID({
                     {editMeasurements.map((m) => (
                       <View
                         key={m.id}
-                        className={`flex-row items-center justify-between p-3 rounded bg-[#080808] border ${
-                          m.is_dominant
-                            ? 'border-yellow-600/40 bg-yellow-900/5'
-                            : 'border-zinc-800/50'
-                        }`}
+                        className="flex-row items-center justify-between p-3 rounded bg-[#080808] border border-zinc-800/50"
                       >
                         <View className="flex-row items-center gap-3 flex-1">
-                          <TouchableOpacity onPress={() => toggleDominant(m.id)}>
-                            <Crown
-                              size={14}
-                              color={m.is_dominant ? '#eab308' : '#3f3f46'}
-                              fill={m.is_dominant ? '#eab308' : 'none'}
-                            />
-                          </TouchableOpacity>
                           <Text
-                            className={`text-xs font-bold uppercase w-24 ${
-                              m.is_dominant ? 'text-white' : 'text-zinc-400'
-                            }`}
+                            className="text-xs font-bold uppercase w-24 text-zinc-400"
                           >
                             {m.name}
                           </Text>
@@ -809,16 +704,6 @@ export default function TrensID({
                       {isSaving ? 'Guardando...' : 'Guardar Ficha'}
                     </Text>
                   </TouchableOpacity>
-
-                  {/* Nota explicativa - Hank */}
-                  <View className="bg-zinc-900/50 p-3 rounded border border-zinc-800">
-                    <Text className="text-[10px] text-zinc-400 text-center">
-                      💡 Para sincronizar macros con tu plan, habla con Hank:
-                    </Text>
-                    <Text className="text-[10px] text-savage-red text-center font-mono mt-1">
-                      "Recalcula mis macros con mi nuevo peso"
-                    </Text>
-                  </View>
                 </View>
               </ScrollView>
             )}
@@ -834,48 +719,6 @@ export default function TrensID({
           </Text>
         </View>
       )}
-
-      {/* Progress Photos Slider - Solo visible cuando no está expandido */}
-      {!isExpanded && (
-        <View className="mt-4 -mx-4">
-          <ProgressSlider
-            userId={userId}
-            onAddPhoto={() => setShowAddPhotoModal(true)}
-            onViewPhoto={(photo) => {
-              setSelectedPhoto(photo);
-              setShowPhotoDetailModal(true);
-            }}
-            refreshTrigger={progressRefreshTrigger}
-          />
-        </View>
-      )}
-
-      {/* Modal: Agregar Foto de Progreso */}
-      <AddProgressPhotoModal
-        visible={showAddPhotoModal}
-        userId={userId}
-        onClose={() => setShowAddPhotoModal(false)}
-        onSuccess={() => {
-          setShowAddPhotoModal(false);
-          setProgressRefreshTrigger((prev) => prev + 1);
-        }}
-      />
-
-      {/* Modal: Detalle de Foto */}
-      <ProgressPhotoDetailModal
-        visible={showPhotoDetailModal}
-        photo={selectedPhoto}
-        userId={userId}
-        onClose={() => {
-          setShowPhotoDetailModal(false);
-          setSelectedPhoto(null);
-        }}
-        onDeleted={() => {
-          setShowPhotoDetailModal(false);
-          setSelectedPhoto(null);
-          setProgressRefreshTrigger((prev) => prev + 1);
-        }}
-      />
     </View>
   );
 }

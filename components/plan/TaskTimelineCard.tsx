@@ -53,7 +53,10 @@ export const TaskTimelineCard: React.FC<TaskTimelineCardProps> = ({ task, onTogg
             <Text className="text-zinc-500 text-[10px] font-bold tracking-widest">TAREA</Text>
           </View>
           {!!time && (
-            <View className="px-3 py-1 rounded-lg" style={{ backgroundColor: 'rgba(220, 38, 38, 0.2)' }}>
+            <View
+              className="px-3 py-1 rounded-lg"
+              style={{ backgroundColor: 'rgba(220, 38, 38, 0.2)' }}
+            >
               <Text className="text-xs font-bold font-mono" style={{ color: RED }}>
                 {time}
               </Text>

@@ -192,7 +192,11 @@ export default function MesScreen() {
         {/* Calendario */}
         <View className="px-5 pt-5">
           <View className="flex-row items-center justify-between mb-1">
-            <Pressable onPress={() => changeMonth(-1)} hitSlop={10} className="p-2 active:opacity-60">
+            <Pressable
+              onPress={() => changeMonth(-1)}
+              hitSlop={10}
+              className="p-2 active:opacity-60"
+            >
               <ChevronLeft size={22} color="#A1A1AA" />
             </Pressable>
             <View className="items-center">
@@ -202,7 +206,11 @@ export default function MesScreen() {
                 {monthEventCount === 1 ? 'EVENTO' : 'EVENTOS'}
               </Text>
             </View>
-            <Pressable onPress={() => changeMonth(1)} hitSlop={10} className="p-2 active:opacity-60">
+            <Pressable
+              onPress={() => changeMonth(1)}
+              hitSlop={10}
+              className="p-2 active:opacity-60"
+            >
               <ChevronRight size={22} color="#A1A1AA" />
             </Pressable>
           </View>
@@ -217,7 +225,8 @@ export default function MesScreen() {
 
           <View className="flex-row flex-wrap">
             {cells.map((day, idx) => {
-              if (day === null) return <View key={`e${idx}`} style={{ width: `${100 / 7}%`, height: 54 }} />;
+              if (day === null)
+                return <View key={`e${idx}`} style={{ width: `${100 / 7}%`, height: 54 }} />;
 
               const iso = isoOf(year, month, day);
               const dayTasks = tasksByDate[iso] || [];

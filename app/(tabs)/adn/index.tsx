@@ -70,6 +70,7 @@ interface UserProfile {
   goal: string;
   injuries: string;
   allergies: string;
+  bmi?: number;
   // Campos de ultra personalización
   age?: number;
   sex?: string;
@@ -157,7 +158,6 @@ function AdnScreenContent() {
   const { canSave } = useSaveGuard();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [adnFocusKey, setAdnFocusKey] = useState(0);
   const [activeTab, setActiveTab] = useState<'legacy' | 'vault'>('legacy');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -349,15 +349,6 @@ function AdnScreenContent() {
         .select('id', { count: 'exact' })
         .eq('user_id', user.id);
 
-      // Obtener foto de progreso más reciente con datos de snapshot
-      const { data: latestProgressPhoto } = await supabase
-        .from('progress_photos')
-        .select('snapshot, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
       // Si no existe perfil, crear uno
       if (!profileData) {
         const { data: newProfile, error: createError } = await supabase
@@ -481,7 +472,6 @@ function AdnScreenContent() {
   useFocusEffect(
     useCallback(() => {
       fetchData();
-      setAdnFocusKey((prev) => prev + 1);
     }, [fetchData])
   );
 
@@ -948,6 +938,7 @@ function AdnScreenContent() {
                       height: profile.height,
                       injuries: profile.injuries,
                       allergies: profile.allergies,
+                      bmi: profile.bmi,
                       // Biometría avanzada
                       age: profile.age,
                       sex: profile.sex,
@@ -971,6 +962,7 @@ function AdnScreenContent() {
                       height: '0',
                       injuries: '',
                       allergies: '',
+                      bmi: undefined,
                       age: undefined,
                       sex: undefined,
                       body_fat_percentage: undefined,
@@ -987,7 +979,6 @@ function AdnScreenContent() {
               }
               measurements={measurements}
               onUpdate={fetchData}
-              focusKey={adnFocusKey}
             />
           )}
         </View>
