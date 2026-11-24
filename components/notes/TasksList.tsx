@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { Check, Clock } from 'lucide-react-native';
+import { Check, Clock, Repeat } from 'lucide-react-native';
 import * as Haptics from '../../lib/haptics';
 import { UserTask, formatDateLabel, formatTime12, localDateISO } from './taskTypes';
 
@@ -33,7 +33,7 @@ export function TasksList({ tasks, onToggle, onEdit, onClearDone }: TasksListPro
             onPress={() => onEdit(task)}
             className="flex-row items-center gap-3 rounded-2xl px-4 py-3 active:scale-[0.99]"
             style={{
-              backgroundColor: 'rgba(24, 24, 27, 0.95)',
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
               borderWidth: 1,
               borderColor: task.is_done ? 'rgba(255,255,255,0.06)' : 'rgba(220, 38, 38, 0.35)',
               opacity: task.is_done ? 0.55 : 1,
@@ -69,6 +69,12 @@ export function TasksList({ tasks, onToggle, onEdit, onClearDone }: TasksListPro
                 >
                   {formatDateLabel(task.task_date)}
                 </Text>
+              )}
+              {task.recurrence === 'monthly' && (
+                <View className="flex-row items-center gap-1 mt-0.5">
+                  <Repeat size={10} color="#71717A" />
+                  <Text className="text-zinc-500 text-[10px] font-mono">CADA MES</Text>
+                </View>
               )}
             </View>
 

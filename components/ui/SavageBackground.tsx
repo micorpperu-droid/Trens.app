@@ -19,6 +19,10 @@ export interface SavageBackgroundProps {
    * - `subtle`: minimal — one small orb + 6 particles. Use behind dense content.
    */
   variant?: 'hero' | 'screen' | 'subtle';
+  /**
+   * Paleta: `fire` (rojo/naranja, CEO) o `mono` (escala de grises, resto de módulos).
+   */
+  tone?: 'fire' | 'mono';
   /** Disable the floating fire embers (still keeps orbs + gradient). */
   disableParticles?: boolean;
   /** Disable the radial gradient overlay. */
@@ -40,11 +44,13 @@ export interface SavageBackgroundProps {
  */
 export const SavageBackground: React.FC<SavageBackgroundProps> = ({
   variant = 'screen',
+  tone = 'fire',
   disableParticles = false,
   disableGradient = false,
   style,
 }) => {
   const config = getVariantConfig(variant);
+  const mono = tone === 'mono';
 
   return (
     <View
@@ -65,7 +71,7 @@ export const SavageBackground: React.FC<SavageBackgroundProps> = ({
       {/* Base radial darkness */}
       {!disableGradient && (
         <LinearGradient
-          colors={['#1a0505', '#0a0000', '#000000']}
+          colors={mono ? ['#18181b', '#0a0a0b', '#000000'] : ['#1a0505', '#0a0000', '#000000']}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
@@ -76,7 +82,7 @@ export const SavageBackground: React.FC<SavageBackgroundProps> = ({
       {config.orbs.map((orb, i) => (
         <GlowOrb
           key={`orb-${i}`}
-          color={orb.color}
+          color={mono ? MONO_ORB[orb.color] || '#71717A' : orb.color}
           size={orb.size}
           top={orb.top}
           left={orb.left}
@@ -88,7 +94,7 @@ export const SavageBackground: React.FC<SavageBackgroundProps> = ({
       {/* Top fire glow band */}
       {!disableGradient && (
         <LinearGradient
-          colors={['rgba(220, 38, 38, 0.18)', 'transparent']}
+          colors={mono ? ['rgba(255, 255, 255, 0.10)', 'transparent'] : ['rgba(220, 38, 38, 0.18)', 'transparent']}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 220 }}
@@ -106,9 +112,17 @@ export const SavageBackground: React.FC<SavageBackgroundProps> = ({
       )}
 
       {/* Floating fire embers */}
-      {!disableParticles && <FloatingParticles count={config.particles} color="#F97316" />}
+      {!disableParticles && <FloatingParticles count={config.particles} color={mono ? '#D4D4D8' : '#F97316'} />}
     </View>
   );
+};
+
+// Equivalentes en grises de los colores de los orbes
+const MONO_ORB: Record<string, string> = {
+  '#DC2626': '#A1A1AA',
+  '#F97316': '#71717A',
+  '#B91C1C': '#52525B',
+  '#991B1B': '#52525B',
 };
 
 // ----------------------------------------------------------------------------

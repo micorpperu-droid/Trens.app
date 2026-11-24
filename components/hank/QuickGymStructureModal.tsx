@@ -177,7 +177,7 @@ export const QuickGymStructureModal: React.FC<QuickGymStructureModalProps> = ({
 
   const handleGoToGym = () => {
     onClose();
-    setTimeout(() => router.push('/(tabs)/gym'), 200);
+    setTimeout(() => router.push({ pathname: '/(tabs)/gym', params: { sport: 'GYM' } } as any), 200);
   };
 
   const currentDay = days[selectedDay];

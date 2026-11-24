@@ -4,22 +4,12 @@ import { View, Text, Platform, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  Play,
-  User,
   ShieldUser,
   Zap,
-  Form,
   Crosshair,
-  Dumbbell,
-  Utensils,
-  Warehouse,
-  Flag,
-  Sailboat,
-  Waves,
   Camera,
   StickyNote,
   CalendarDays,
-  LucideIcon,
 } from 'lucide-react-native';
 import Animated, {
   useAnimatedStyle,
@@ -32,10 +22,8 @@ import Animated, {
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { PanResponder, Dimensions, Animated as RNAnimated } from 'react-native';
 import { useAuth, useProRecording } from '../_layout';
-import { useSport } from '../../context/SportContext';
 import { HankOverlay } from '../../components/hank/HankOverlay';
 import { SpotifyOverlay } from '../../components/spotify/SpotifyOverlay';
-import { SportSelectorBar } from '../../components/sport/SportSelectorBar';
 import * as Haptics from '../../lib/haptics';
 import { supabase } from '../../lib/supabase';
 
@@ -52,29 +40,6 @@ const ED_HARDY = {
   neonRed: '#FF3B3B',
   zinc800: '#27272a',
   zinc600: '#52525b',
-};
-
-// ============================================================================
-// MAPA DE ICONOS POR NOMBRE
-// ============================================================================
-const ICON_MAP: Record<string, LucideIcon> = {
-  Play,
-  User,
-  ShieldUser,
-  Zap,
-  Timeline: Form,
-  Form,
-  Crosshair,
-  Dumbbell,
-  Utensils,
-  Warehouse,
-  Flag,
-  Sailboat,
-  Waves,
-};
-
-const getIconComponent = (iconName: string): LucideIcon => {
-  return ICON_MAP[iconName] || Dumbbell;
 };
 
 // Componente de icono simple para tabs
@@ -96,46 +61,25 @@ function TabIcon({
   );
 }
 
-// Mismo botón circular con mira que tenía PRO, sin captura
+// Botón circular con mira: al enfocarse solo el icono pasa a naranja
 function CenterTabIcon({ focused }: { focused: boolean }) {
   return (
     <View style={{ alignItems: 'center', overflow: 'visible' }} pointerEvents="box-none">
       <View
         style={{
-          padding: focused ? 4 : 16,
+          padding: 16,
           borderRadius: 999,
-          backgroundColor: focused ? '#FFFFFF' : ED_HARDY.zinc800,
+          backgroundColor: ED_HARDY.zinc800,
           marginBottom: 20,
           alignItems: 'center',
           justifyContent: 'center',
-          ...(Platform.OS !== 'web'
-            ? {
-                shadowColor: focused ? ED_HARDY.neonRed : 'transparent',
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: focused ? 0.8 : 0,
-                shadowRadius: 15,
-                elevation: focused ? 15 : 0,
-              }
-            : {}),
         }}
       >
-        {focused ? (
-          <View
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: '#FFFFFF',
-              margin: 2,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Crosshair color={ED_HARDY.black} size={26} strokeWidth={2.5} />
-          </View>
-        ) : (
-          <Crosshair color="#FFFFFF" size={28} strokeWidth={2.5} />
-        )}
+        <Crosshair
+          color={focused ? ED_HARDY.fireOrange : '#FFFFFF'}
+          size={28}
+          strokeWidth={2.5}
+        />
       </View>
     </View>
   );
@@ -412,13 +356,8 @@ export default function TabsLayout() {
     })();
   }, [user, loading]);
 
-  // Obtener configuración de tabs según deporte activo
-  const { activeSport, getTabConfig } = useSport();
-  const tabConfig = getTabConfig();
-
-  // Iconos dinámicos para tabs 4 y 5
-  const Tab4Icon = getIconComponent(tabConfig.tab4.icon);
-  const sportColor = tabConfig.color;
+  // Los módulos de la barra no cambian de nombre ni de color según el deporte
+  const sportColor = ED_HARDY.fireRed;
 
   // Altura dinámica del tab bar basada en safe area
   // En web insets.bottom es 0, necesitamos padding mínimo para que el texto no se corte
@@ -681,8 +620,8 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="gym/index"
             options={{
-              title: tabConfig.tab4.name,
-              tabBarIcon: ({ color }) => <TabIcon Icon={Tab4Icon} color={color} size={26} />,
+              title: 'SPORT',
+              tabBarIcon: ({ color }) => <TabIcon Icon={Zap} color={color} size={26} />,
               lazy: false,
             }}
           />
@@ -746,7 +685,6 @@ export default function TabsLayout() {
       {/* Overlays globales - aquí tienen contexto de navegación */}
       <HankOverlay />
       <SpotifyOverlay />
-      <SportSelectorBar />
     </View>
   );
 }

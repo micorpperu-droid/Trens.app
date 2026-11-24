@@ -46,11 +46,14 @@ import { useHank } from '../../../context/HankContext';
 import { useSaveGuard } from '../../_layout';
 import spotify from '../../../services/spotify/spotify';
 import TrensID from '../../../components/adn/TrensID';
+import ShopPreviewCard from '../../../components/shop/ShopPreviewCard';
+import StackSummaryCard from '../../../components/adn/StackSummaryCard';
+import EquipmentSummaryCard from '../../../components/adn/EquipmentSummaryCard';
 import RecordCard from '../../../components/adn/RecordCard';
 import InstagramConnectButton from '../../../components/adn/InstagramConnectButton';
 import SelectRecordVideoModal from '../../../components/adn/SelectRecordVideoModal';
 import { GuestModuleLanding } from '../../../components/auth/GuestModuleLanding';
-import { SportBadges } from '../../../components/adn/SportBadges';
+import { SportTags } from '../../../components/adn/SportTags';
 import { TodayCards } from '../../../components/adn/TodayCards';
 import { ProUpgradeModal } from '../../../components/pro/ProUpgradeModal';
 import { ShareModal } from '../../../components/share/ShareModal';
@@ -907,16 +910,10 @@ function AdnScreenContent() {
                   </View>
                 )}
               </View>
+              {isOwner && <SportTags />}
             </View>
           </View>
         </View>
-
-        {/* SELECTOR DE DEPORTES — alternar/agregar deportes (GYM/MOTO/AUTO/SURF) */}
-        {isOwner && (
-          <View className="px-4 mt-4">
-            <SportBadges />
-          </View>
-        )}
 
         {/* TODAY CARDS - Entrenamiento y Próxima Comida/Stack */}
         {isOwner && user && (
@@ -982,6 +979,19 @@ function AdnScreenContent() {
             />
           )}
         </View>
+
+        {/* TIENDA — vista previa que abre el modal de tienda */}
+        {isOwner && (
+          <View className="px-4">
+            <ShopPreviewCard />
+            {user && (
+              <>
+                <StackSummaryCard userId={user.id} />
+                <EquipmentSummaryCard userId={user.id} />
+              </>
+            )}
+          </View>
+        )}
 
         {/* INSTAGRAM CONNECT — Oculto temporalmente
         {isOwner && isPro && (

@@ -108,6 +108,10 @@ import { CardioBlock } from '../../../components/plan/CardioBlockCard';
 import { AddCardioModal, AddCardioData } from '../../../components/plan/AddCardioModal';
 import { FocusCardioSlide } from '../../../components/gym/FocusCardioSlide';
 import { SportEquipmentLocationScreen } from '../../../components/sport/SportEquipmentLocationScreen';
+import { SportListScreen } from '../../../components/sport/SportListScreen';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { ChevronLeft } from 'lucide-react-native';
+import { SportSwitcherModal } from '../../../components/adn/SportSwitcher';
 
 // ============================================================================
 // HELPERS
@@ -544,15 +548,114 @@ const SpotifyAlbumBackground: React.FC<SpotifyAlbumBackgroundProps> = React.memo
 // TAB 4 ROUTER - Renderiza el contenido correcto según el deporte activo
 // ============================================================================
 function Tab4RouterContent() {
-  const { activeSport } = useSport();
-  const sportCode = activeSport?.code || 'GYM';
+  const { activeSport, allSports, userSports, loading, setActiveSport } = useSport();
+  const { sport: sportParam } = useLocalSearchParams<{ sport?: string }>();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [showList, setShowList] = useState(true);
+  const [sportsModalVisible, setSportsModalVisible] = useState(false);
+
+  const mySports = useMemo(
+    () => allSports.filter((s) => userSports.some((us) => us.sport_id === s.id)),
+    [allSports, userSports]
+  );
+  const hasMultiple = mySports.length > 1;
+
+  // Con un solo deporte se muestra directo, y debe quedar como deporte activo
+  useEffect(() => {
+    if (mySports.length === 1 && activeSport?.id !== mySports[0].id) {
+      setActiveSport(mySports[0].code);
+    }
+  }, [mySports, activeSport, setActiveSport]);
+
+  // Al entrar al módulo SPORT se muestra la lista, salvo que otra pantalla
+  // pida un deporte concreto (?sport=GYM)
+  const sportParamRef = useRef(sportParam);
+  sportParamRef.current = sportParam;
+  useFocusEffect(
+    useCallback(() => {
+      if (!sportParamRef.current) setShowList(true);
+    }, [])
+  );
+  useEffect(() => {
+    if (!sportParam) return;
+    setActiveSport(sportParam);
+    setShowList(false);
+    router.setParams({ sport: undefined });
+  }, [sportParam]);
+
+  if (loading) {
+    return (
+      <View className="flex-1 bg-black items-center justify-center">
+        <ActivityIndicator size="large" color="#DC2626" />
+      </View>
+    );
+  }
+
+  const sportsModal = (
+    <SportSwitcherModal visible={sportsModalVisible} onClose={() => setSportsModalVisible(false)} />
+  );
+
+  if (hasMultiple && showList) {
+    return (
+      <>
+        <SportListScreen
+          sports={mySports}
+          onSelect={(sport) => {
+            setActiveSport(sport.code);
+            setShowList(false);
+          }}
+          onAddSport={() => setSportsModalVisible(true)}
+        />
+        {sportsModal}
+      </>
+    );
+  }
+
+  const shown = mySports.length === 1 ? mySports[0] : activeSport;
 
   // GYM conserva la pantalla original (constructor de rutinas). El resto de
-  // deportes usa la nueva estructura genérica: Equipo + Lugares.
-  if (sportCode === 'GYM' || !activeSport) {
-    return <GymScreen />;
-  }
-  return <SportEquipmentLocationScreen sport={activeSport} />;
+  // deportes usa la estructura genérica: Equipo + Lugares + Eventos.
+  const detail =
+    !shown || shown.code === 'GYM' ? (
+      <GymScreen />
+    ) : (
+      <SportEquipmentLocationScreen sport={shown} />
+    );
+
+  // Un solo deporte (o invitado): pantalla directa
+  if (!shown || !hasMultiple) return detail;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <View
+        className="flex-row items-center justify-between"
+        style={{
+          paddingTop: insets.top + 4,
+          paddingBottom: 6,
+          paddingHorizontal: 16,
+          zIndex: 20,
+          backgroundColor: '#000',
+        }}
+      >
+        <TouchableOpacity
+          onPress={() => setShowList(true)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          className="flex-row items-center py-1.5 pr-3"
+        >
+          <ChevronLeft size={18} color="#A1A1AA" />
+          <Text className="text-zinc-400 text-[11px] font-black tracking-widest">DEPORTES</Text>
+        </TouchableOpacity>
+        <Text
+          className="text-[11px] font-black tracking-widest"
+          style={{ color: shown.color_primary || '#DC2626' }}
+        >
+          {shown.name.toUpperCase()}
+        </Text>
+      </View>
+      <View style={{ flex: 1, marginTop: -insets.top }}>{detail}</View>
+    </View>
+  );
 }
 
 export default function Tab4Router() {
@@ -6127,7 +6230,7 @@ function GymScreen() {
             >
               <Zap color="#DC2626" size={16} />
               <Text className="text-savage-red font-bold text-sm">
-                ESTRUCTURA RECOMENDADA POR HANK
+                ESTRUCTURA RECOMENDADA
               </Text>
             </TouchableOpacity>
           </View>
@@ -6712,8 +6815,7 @@ function GymScreen() {
                       <Plus size={14} color="#fff" />
                     </View>
                     <Text className="text-zinc-400 text-[10px]">
-                      Estructura recomendada por{' '}
-                      <Text className="text-savage-red font-bold">HANK</Text>
+                      Estructura recomendada
                     </Text>
                   </View>
                   <View className="w-px h-4 bg-zinc-700" />
@@ -11006,7 +11108,7 @@ function GymScreen() {
               >
                 <Zap color="#DC2626" size={16} />
                 <Text className="text-savage-red font-bold text-sm">
-                  ESTRUCTURA RECOMENDADA POR HANK
+                  ESTRUCTURA RECOMENDADA
                 </Text>
               </TouchableOpacity>
             </View>

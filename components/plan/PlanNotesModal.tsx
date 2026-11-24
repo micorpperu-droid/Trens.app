@@ -1,5 +1,5 @@
 // ============================================================================
-// PLAN NOTES MODAL - Notas con 3 tipos: Pizarra, Entrenamiento, Nutrición
+// PLAN NOTES MODAL - Pizarra: nota libre del usuario
 // PREMIUM SAVAGE EDITION
 // ============================================================================
 
@@ -15,74 +15,98 @@ import {
   ScrollView,
   ActivityIndicator,
   PanResponder,
-  Dimensions,
 } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
-import { StickyNote, Save, Dumbbell, Utensils, PenLine } from 'lucide-react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { PenLine, Save } from 'lucide-react-native';
 import { Haptics } from '../../lib/haptics';
 import { supabase } from '../../lib/supabase';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-type NoteType = 'pizarra' | 'entrenamiento' | 'nutricion';
-
-const NOTE_TABS: Array<{ type: NoteType; label: string; icon: React.ReactNode; color: string }> = [
-  {
-    type: 'pizarra',
-    label: 'Pizarra',
-    icon: <PenLine size={14} color="#EAB308" />,
-    color: '#EAB308',
-  },
-  {
-    type: 'entrenamiento',
-    label: 'Entreno',
-    icon: <Dumbbell size={14} color="#DC2626" />,
-    color: '#DC2626',
-  },
-  {
-    type: 'nutricion',
-    label: 'Nutrición',
-    icon: <Utensils size={14} color="#22c55e" />,
-    color: '#22c55e',
-  },
-];
+const ACCENT = '#EAB308';
 
 interface PlanNotesModalProps {
   visible: boolean;
   onClose: () => void;
-  initialTab?: NoteType;
 }
 
-export const PlanNotesModal: React.FC<PlanNotesModalProps> = ({
-  visible,
-  onClose,
-  initialTab = 'pizarra',
-}) => {
-  const [activeTab, setActiveTab] = useState<NoteType>(initialTab);
-  const [notesMap, setNotesMap] = useState<Record<NoteType, string>>({
-    pizarra: '',
-    entrenamiento: '',
-    nutricion: '',
-  });
-  const [savedMap, setSavedMap] = useState<Record<NoteType, boolean>>({
-    pizarra: true,
-    entrenamiento: true,
-    nutricion: true,
-  });
+export const PlanNotesModal: React.FC<PlanNotesModalProps> = ({ visible, onClose }) => {
+  const [content, setContent] = useState('');
+  const [saved, setSaved] = useState(true);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const inputRef = useRef<TextInput>(null);
-  const pagerRef = useRef<ScrollView>(null);
+  const contentRef = useRef('');
+  const savedRef = useRef(true);
 
-  // ===== ANIMACIONES FLUIDAS =====
   const translateY = useSharedValue(0);
-  const pillIndicatorX = useSharedValue(0);
+
+  const loadNote = useCallback(async () => {
+    setLoading(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('plan_notes')
+        .select('content')
+        .eq('user_id', user.id)
+        .eq('note_type', 'pizarra')
+        .maybeSingle();
+
+      const text = data?.content || '';
+      contentRef.current = text;
+      savedRef.current = true;
+      setContent(text);
+      setSaved(true);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (visible) {
+      translateY.value = 0;
+      loadNote();
+    }
+  }, [visible, loadNote, translateY]);
+
+  const saveNote = useCallback(async () => {
+    setSaving(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      await supabase.from('plan_notes').upsert(
+        {
+          user_id: user.id,
+          note_type: 'pizarra',
+          content: contentRef.current,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,note_type' }
+      );
+
+      savedRef.current = true;
+      setSaved(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // ignore
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  const handleClose = useCallback(async () => {
+    if (!savedRef.current) await saveNote();
+    onClose();
+  }, [saveNote, onClose]);
+
+  const handleCloseRef = useRef(handleClose);
+  handleCloseRef.current = handleClose;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -99,7 +123,7 @@ export const PlanNotesModal: React.FC<PlanNotesModalProps> = ({
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy > 100 || gestureState.vy > 0.5) {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          handleClose();
+          handleCloseRef.current();
         } else {
           translateY.value = withSpring(0, { damping: 20, stiffness: 300 });
         }
@@ -111,154 +135,12 @@ export const PlanNotesModal: React.FC<PlanNotesModalProps> = ({
     transform: [{ translateY: translateY.value }],
   }));
 
-  const pillIndicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: pillIndicatorX.value }],
-  }));
-
-  // Guardar el índice inicial para aplicarlo después del load
-  const pendingTabIndex = useRef(0);
-
-  // Cargar todas las notas al abrir
-  useEffect(() => {
-    if (visible) {
-      translateY.value = 0;
-      const tabIndex = NOTE_TABS.findIndex((t) => t.type === initialTab);
-      const idx = tabIndex >= 0 ? tabIndex : 0;
-      pendingTabIndex.current = idx;
-      setActiveTab(NOTE_TABS[idx].type);
-      pillIndicatorX.value = idx * ((SCREEN_WIDTH - 48) / 3);
-      loadAllNotes();
-    }
-  }, [visible, initialTab]);
-
-  // Scroll al tab correcto después de que las notas cargan
-  useEffect(() => {
-    if (visible && !loading) {
-      const idx = pendingTabIndex.current;
-      // Múltiples intentos para asegurar que el ScrollView está listo
-      const t1 = setTimeout(() => {
-        pagerRef.current?.scrollTo({ x: idx * (SCREEN_WIDTH - 32), animated: false });
-      }, 50);
-      const t2 = setTimeout(() => {
-        pagerRef.current?.scrollTo({ x: idx * (SCREEN_WIDTH - 32), animated: false });
-      }, 200);
-      const t3 = setTimeout(() => {
-        pagerRef.current?.scrollTo({ x: idx * (SCREEN_WIDTH - 32), animated: false });
-      }, 500);
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-        clearTimeout(t3);
-      };
-    }
-  }, [visible, loading]);
-
-  const loadAllNotes = useCallback(async () => {
-    setLoading(true);
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data } = await supabase
-        .from('plan_notes')
-        .select('content, note_type')
-        .eq('user_id', user.id);
-
-      const map: Record<NoteType, string> = { pizarra: '', entrenamiento: '', nutricion: '' };
-      if (data) {
-        data.forEach((row: any) => {
-          if (row.note_type in map) {
-            map[row.note_type as NoteType] = row.content || '';
-          }
-        });
-      }
-      setNotesMap(map);
-      setSavedMap({ pizarra: true, entrenamiento: true, nutricion: true });
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const saveNote = useCallback(
-    async (type: NoteType) => {
-      setSaving(true);
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) return;
-
-        await supabase.from('plan_notes').upsert(
-          {
-            user_id: user.id,
-            note_type: type,
-            content: notesMap[type],
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'user_id,note_type' }
-        );
-
-        setSavedMap((prev) => ({ ...prev, [type]: true }));
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch {
-        // ignore
-      } finally {
-        setSaving(false);
-      }
-    },
-    [notesMap]
-  );
-
-  const saveAllUnsaved = useCallback(async () => {
-    const unsaved = (Object.keys(savedMap) as NoteType[]).filter((k) => !savedMap[k]);
-    for (const type of unsaved) {
-      await saveNote(type);
-    }
-  }, [savedMap, saveNote]);
-
-  const handleClose = async () => {
-    await saveAllUnsaved();
-    onClose();
-  };
-
   const handleTextChange = (text: string) => {
-    setNotesMap((prev) => ({ ...prev, [activeTab]: text }));
-    setSavedMap((prev) => ({ ...prev, [activeTab]: false }));
+    contentRef.current = text;
+    savedRef.current = false;
+    setContent(text);
+    setSaved(false);
   };
-
-  const PILL_WIDTH = (SCREEN_WIDTH - 48) / 3;
-
-  const switchTab = (type: NoteType, index: number) => {
-    setActiveTab(type);
-    pillIndicatorX.value = withTiming(index * PILL_WIDTH, {
-      duration: 200,
-      easing: Easing.out(Easing.ease),
-    });
-    pagerRef.current?.scrollTo({ x: index * (SCREEN_WIDTH - 32), animated: true });
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
-
-  const lastScrollIndex = useRef(0);
-
-  const handlePagerScroll = (event: any) => {
-    const offsetX = event.nativeEvent.contentOffset.x;
-    const pageWidth = SCREEN_WIDTH - 32;
-    const index = Math.round(offsetX / pageWidth);
-    if (index >= 0 && index < 3 && index !== lastScrollIndex.current) {
-      lastScrollIndex.current = index;
-      const newTab = NOTE_TABS[index].type;
-      setActiveTab(newTab);
-      pillIndicatorX.value = withTiming(index * PILL_WIDTH, { duration: 200 });
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-  };
-
-  const activeColor = NOTE_TABS.find((t) => t.type === activeTab)?.color || '#EAB308';
-  const hasAnyUnsaved = (Object.keys(savedMap) as NoteType[]).some((k) => !savedMap[k]);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
@@ -277,7 +159,7 @@ export const PlanNotesModal: React.FC<PlanNotesModalProps> = ({
                 maxHeight: '90%',
                 flex: 1,
                 borderTopWidth: 2,
-                borderTopColor: `${activeColor}80`,
+                borderTopColor: `${ACCENT}80`,
                 overflow: 'hidden',
               },
             ]}
@@ -290,8 +172,8 @@ export const PlanNotesModal: React.FC<PlanNotesModalProps> = ({
                 left: 0,
                 right: 0,
                 height: 3,
-                backgroundColor: activeColor,
-                shadowColor: activeColor,
+                backgroundColor: ACCENT,
+                shadowColor: ACCENT,
                 shadowOffset: { width: 0, height: 0 },
                 shadowOpacity: 0.8,
                 shadowRadius: 10,
@@ -301,33 +183,31 @@ export const PlanNotesModal: React.FC<PlanNotesModalProps> = ({
 
             {/* Header Draggable */}
             <View {...panResponder.panHandlers}>
-              {/* Drag Indicator */}
               <View className="pt-4 pb-2 items-center">
                 <View className="w-12 h-1.5 bg-zinc-600 rounded-full" />
               </View>
 
-              {/* Header Title */}
               <View className="flex-row items-center justify-between px-4 pb-3">
                 <View className="flex-row items-center gap-2">
-                  <StickyNote size={18} color={activeColor} />
-                  <Text className="text-white font-bold text-lg">Notas</Text>
+                  <PenLine size={18} color={ACCENT} />
+                  <Text className="text-white font-bold text-lg">Pizarra</Text>
                   <Text className="text-zinc-500 text-[10px] font-mono ml-1">
-                    {saving ? 'GUARDANDO...' : hasAnyUnsaved ? 'SIN GUARDAR' : 'GUARDADO'}
+                    {saving ? 'GUARDANDO...' : saved ? 'GUARDADO' : 'SIN GUARDAR'}
                   </Text>
                 </View>
 
-                {hasAnyUnsaved && (
+                {!saved && (
                   <Pressable
-                    onPress={() => saveAllUnsaved()}
+                    onPress={saveNote}
                     className="flex-row items-center gap-1.5 px-3 py-2 rounded-xl active:scale-95"
                     style={{
-                      backgroundColor: `${activeColor}25`,
+                      backgroundColor: `${ACCENT}25`,
                       borderWidth: 1,
-                      borderColor: `${activeColor}60`,
+                      borderColor: `${ACCENT}60`,
                     }}
                   >
-                    <Save size={14} color={activeColor} />
-                    <Text style={{ color: activeColor }} className="text-xs font-bold">
+                    <Save size={14} color={ACCENT} />
+                    <Text style={{ color: ACCENT }} className="text-xs font-bold">
                       GUARDAR
                     </Text>
                   </Pressable>
@@ -335,114 +215,31 @@ export const PlanNotesModal: React.FC<PlanNotesModalProps> = ({
               </View>
             </View>
 
-            {/* Pills */}
-            <View className="px-4 pb-3">
-              <View
-                style={{
-                  flexDirection: 'row',
-                  backgroundColor: '#18181b',
-                  borderRadius: 12,
-                  padding: 3,
-                  position: 'relative',
-                }}
-              >
-                {/* Indicador animado */}
-                <Animated.View
-                  style={[
-                    {
-                      position: 'absolute',
-                      top: 3,
-                      left: 3,
-                      width: PILL_WIDTH,
-                      height: 36,
-                      borderRadius: 10,
-                      backgroundColor: `${activeColor}20`,
-                      borderWidth: 1,
-                      borderColor: `${activeColor}40`,
-                    },
-                    pillIndicatorStyle,
-                  ]}
-                />
-                {NOTE_TABS.map((tab, idx) => (
-                  <Pressable
-                    key={tab.type}
-                    onPress={() => switchTab(tab.type, idx)}
-                    style={{
-                      flex: 1,
-                      height: 36,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 5,
-                    }}
-                  >
-                    {tab.icon}
-                    <Text
-                      style={{
-                        color: activeTab === tab.type ? tab.color : '#71717a',
-                        fontSize: 12,
-                        fontWeight: '700',
-                      }}
-                    >
-                      {tab.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            {/* Content Pager */}
             {loading ? (
               <View className="flex-1 items-center justify-center py-20">
-                <ActivityIndicator size="small" color={activeColor} />
+                <ActivityIndicator size="small" color={ACCENT} />
               </View>
             ) : (
               <ScrollView
-                ref={pagerRef}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                onMomentumScrollEnd={handlePagerScroll}
-                onScroll={handlePagerScroll}
-                scrollEventThrottle={16}
-                style={{ flex: 1 }}
-                contentContainerStyle={{ width: (SCREEN_WIDTH - 32) * 3 }}
+                className="px-5 pt-2"
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ flexGrow: 1 }}
+                showsVerticalScrollIndicator={false}
               >
-                {NOTE_TABS.map((tab) => (
-                  <ScrollView
-                    key={tab.type}
-                    style={{ width: SCREEN_WIDTH - 32 }}
-                    className="px-5 pt-4"
-                    keyboardShouldPersistTaps="handled"
-                    contentContainerStyle={{ flexGrow: 1 }}
-                    showsVerticalScrollIndicator={false}
-                  >
-                    <TextInput
-                      ref={tab.type === activeTab ? inputRef : undefined}
-                      value={notesMap[tab.type]}
-                      onChangeText={(text) => {
-                        setNotesMap((prev) => ({ ...prev, [tab.type]: text }));
-                        setSavedMap((prev) => ({ ...prev, [tab.type]: false }));
-                      }}
-                      placeholder={
-                        tab.type === 'pizarra'
-                          ? 'Notas generales, recordatorios...'
-                          : tab.type === 'entrenamiento'
-                            ? 'Notas de entrenamiento, PRs, ajustes...'
-                            : 'Notas de nutrición, sustituciones...'
-                      }
-                      placeholderTextColor="#52525B"
-                      multiline
-                      textAlignVertical="top"
-                      className="flex-1 text-white text-base leading-6 pb-8 pr-2"
-                      style={{
-                        fontFamily: Platform.OS === 'ios' ? 'System' : 'monospace',
-                        minHeight: 300,
-                        padding: 16,
-                      }}
-                    />
-                  </ScrollView>
-                ))}
+                <TextInput
+                  value={content}
+                  onChangeText={handleTextChange}
+                  placeholder="Notas generales, recordatorios..."
+                  placeholderTextColor="#52525B"
+                  multiline
+                  textAlignVertical="top"
+                  className="flex-1 text-white text-base leading-6 pb-8 pr-2"
+                  style={{
+                    fontFamily: Platform.OS === 'ios' ? 'System' : 'monospace',
+                    minHeight: 300,
+                    padding: 16,
+                  }}
+                />
               </ScrollView>
             )}
           </Animated.View>

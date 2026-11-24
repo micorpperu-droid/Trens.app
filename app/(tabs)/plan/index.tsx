@@ -4,13 +4,30 @@
 // ============================================================================
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  RefreshControl,
+  Modal,
+  ActivityIndicator,
+} from 'react-native';
 import { PWAGuard } from '../../../components/auth/PWAGuard';
 import { GuestModuleLanding } from '../../../components/auth/GuestModuleLanding';
 import { useUserRoleContext } from '../../../context/UserRoleContext';
 import { Alert } from '../../../lib/alert';
 import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
-import { Plus, Flame, Layers } from 'lucide-react-native';
+import {
+  Plus,
+  Flame,
+  Layers,
+  Filter,
+  ChevronDown,
+  Check,
+  ListChecks,
+  CalendarClock,
+} from 'lucide-react-native';
 import * as Haptics from '../../../lib/haptics';
 import { useRouter, useFocusEffect } from 'expo-router';
 
@@ -30,15 +47,16 @@ import { AddCardioModal, AddCardioData } from '../../../components/plan/AddCardi
 import { EventTimelineCard, TimelineEventData } from '../../../components/plan/EventTimelineCard';
 import { TaskTimelineCard, TimelineTaskData } from '../../../components/plan/TaskTimelineCard';
 import { localDateISO } from '../../../components/notes/taskTypes';
+import { TaskEditorModal } from '../../../components/notes/TaskEditorModal';
+import { toggleTaskDone } from '../../../components/notes/taskActions';
+import { SavageBackground } from '../../../components/ui/SavageBackground';
+import { AddSportEventModal } from '../../../components/sport/AddSportEventModal';
 import { supabase } from '../../../lib/supabase';
 import { useHank } from '../../../context/HankContext';
-import { useSaveGuard } from '../../_layout';
+import { useSaveGuard, useAuth } from '../../_layout';
 import { useSport } from '../../../context/SportContext';
 import { useNotifications } from '../../../context/NotificationContext';
 
-// Import sport-specific screens
-import RaceScreen from '../race';
-import SpotScreen from '../spot';
 
 // ============================================================================
 // ============================================================================
@@ -118,6 +136,16 @@ interface TimelineItem {
   data: Meal | Stack | WorkoutBlockData | CardioBlock | TimelineEventData | TimelineTaskData;
   time?: string;
 }
+
+// Tipos de tarjeta que se pueden filtrar en el timeline de HOY
+const FILTER_OPTIONS: { key: TimelineItem['type']; label: string; color: string }[] = [
+  { key: 'meal', label: 'COMIDAS', color: '#22C55E' },
+  { key: 'stack', label: 'STACK', color: '#A855F7' },
+  { key: 'workout', label: 'ENTRENAMIENTO', color: '#DC2626' },
+  { key: 'cardio', label: 'CARDIO', color: '#F97316' },
+  { key: 'task', label: 'TAREAS', color: '#DC2626' },
+  { key: 'event', label: 'EVENTOS', color: '#0EA5E9' },
+];
 
 // ============================================================================
 // HELPERS
@@ -267,23 +295,10 @@ const calculateWorkoutTime = (
 };
 
 // ============================================================================
-// TAB 5 ROUTER - Renderiza el contenido correcto según el deporte activo
+// HOY - Siempre muestra el timeline, sin importar el deporte activo
 // ============================================================================
 function Tab5RouterContent() {
-  const { activeSport } = useSport();
-  const sportCode = activeSport?.code || 'GYM';
-
-  // Renderizar pantalla según deporte
-  switch (sportCode) {
-    case 'MOTO':
-    case 'AUTO':
-      return <RaceScreen />;
-    case 'SURF':
-      return <SpotScreen />;
-    case 'GYM':
-    default:
-      return <PlanScreen />;
-  }
+  return <PlanScreen />;
 }
 
 export default function Tab5Router() {
@@ -303,6 +318,8 @@ function PlanScreen() {
   const { canSave } = useSaveGuard();
   const { syncNotifications } = useNotifications();
   const { isAuthenticated } = useUserRoleContext();
+  const { user: authUser } = useAuth();
+  const { activeSport: planSport } = useSport();
 
   // Sincronizar contexto con HANK
   useFocusEffect(
@@ -382,6 +399,11 @@ function PlanScreen() {
   // Eventos del deporte (agendados desde la sección Sport) para el día de hoy
   const [sportEvents, setSportEvents] = useState<TimelineEventData[]>([]);
   const [timelineTasks, setTimelineTasks] = useState<TimelineTaskData[]>([]);
+  // Filtro del timeline: vacío = todos los tipos
+  const [filterTypes, setFilterTypes] = useState<TimelineItem['type'][]>([]);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [showAddEvent, setShowAddEvent] = useState(false);
 
   // Workout time estimation - calcula dinámicamente basándose en posición del bloque
   const [workoutTimeEstimate, setWorkoutTimeEstimate] = useState<WorkoutTimeEstimate>({
@@ -406,11 +428,18 @@ function PlanScreen() {
   // ============================================================================
   // DATA FETCHING
   // ============================================================================
+  const fetchInFlight = useRef(false);
+  const fetchPending = useRef(false);
+
   const fetchData = useCallback(async () => {
+    if (fetchInFlight.current) {
+      fetchPending.current = true;
+      return;
+    }
+    fetchInFlight.current = true;
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      // Usuario del contexto de auth (evita una llamada de red a getUser en cada carga)
+      const user = authUser;
 
       // Si no hay usuario, mostrar vista vacía
       if (!user) {
@@ -427,9 +456,22 @@ function PlanScreen() {
       // Ya no usamos nutrition_plans, directamente cargamos meals
       setPlanName('HOY');
 
-      // Fetch meals - columnas reales de la tabla meals
-      // Fetch meals con sus opciones (alternativas)
-      const { data: mealsData, error: mealsError } = await supabase
+      // Todas las consultas del día en paralelo (antes eran secuenciales)
+      const todayISO = localDateISO();
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const [
+        mealsRes,
+        stackRes,
+        cardioRes,
+        eventsRes,
+        tasksRes,
+        posRes,
+        profileRes,
+        userProfileRes,
+        configsRes,
+      ] = await Promise.all([
+        supabase
         .from('meals')
         .select(
           `
@@ -452,13 +494,74 @@ function PlanScreen() {
         `
         )
         .eq('user_id', user.id)
-        .order('scheduled_time', { ascending: true });
+        .order('scheduled_time', { ascending: true }),
+        supabase
+        .from('supplement_stack')
+        .select('*, product:shop_products(id, name, thumbnail_url, price)')
+        .eq('user_id', user.id)
+        .eq('is_active', true),
+        supabase
+        .from('cardio_blocks')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('display_order', { ascending: true }),
+        supabase
+        .from('sport_events')
+        .select(
+          'id, event_time, maps_url, latitude, longitude, location, notes, media_url, media_type'
+        )
+        .eq('user_id', user.id)
+        .eq('event_date', todayISO),
+        supabase
+        .from('user_tasks')
+        .select('id, content, due_time, is_done, task_date, recurrence, recur_day')
+        .eq('user_id', user.id)
+        .eq('task_date', localDateISO())
+        .or(`due_time.not.is.null,created_at.lt.${startOfToday.toISOString()}`),
+        supabase
+        .from('workout_block_position')
+        .select('position, session_index, scheduled_time')
+        .eq('user_id', user.id)
+        .order('session_index', { ascending: true }),
+        supabase
+        .from('profiles')
+        .select('training_routine_names, training_session_names, workout_scheduled_times')
+        .eq('id', user.id)
+        .single(),
+        supabase
+        .from('user_profiles')
+        .select('training_mode, external_schedule')
+        .eq('user_id', user.id)
+        .single(),
+        supabase
+        .from('user_exercise_config')
+        .select(
+          `
+          id,
+          exercise_id,
+          training_days,
+          display_order,
+          custom_media_url,
+          session_index,
+          exercises (
+            id,
+          name,
+          default_media_url,
+          thumbnail_url,
+          video_url
+        )
+      `
+        )
+        .eq('user_id', user.id)
+        .order('display_order', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true }),
+      ]);
 
-      console.warn('🍽️ PLAN: Meals query result:', {
-        count: mealsData?.length || 0,
-        error: mealsError?.message,
-        meals: mealsData,
-      });
+      // Fetch meals - columnas reales de la tabla meals
+      // Fetch meals con sus opciones (alternativas)
+      const { data: mealsData, error: mealsError } = mealsRes;
+
+      if (mealsError) console.error('Error cargando comidas:', mealsError);
 
       if (mealsData && mealsData.length > 0) {
         const formattedMeals: Meal[] = mealsData.map((meal: any, index: number) => {
@@ -544,11 +647,7 @@ function PlanScreen() {
       }
 
       // Fetch supplement stack (con datos del producto vinculado si existe)
-      const { data: stackData } = await supabase
-        .from('supplement_stack')
-        .select('*, product:shop_products(id, name, thumbnail_url, price)')
-        .eq('user_id', user.id)
-        .eq('is_active', true);
+      const { data: stackData } = stackRes;
 
       if (stackData) {
         const formattedStack: StackItem[] = stackData.map((item: any) => ({
@@ -574,11 +673,7 @@ function PlanScreen() {
       }
 
       // Fetch cardio blocks for today's training day
-      const { data: cardioData } = await supabase
-        .from('cardio_blocks')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('display_order', { ascending: true });
+      const { data: cardioData } = cardioRes;
 
       if (cardioData && cardioData.length > 0) {
         setCardioBlocks(cardioData as CardioBlock[]);
@@ -588,36 +683,18 @@ function PlanScreen() {
 
       // Fetch eventos del deporte agendados para HOY (sport_events, alimenta la
       // tarjeta genérica del timeline — se crean desde la sección Sport)
-      const todayISO = localDateISO();
-      const { data: eventsData } = await supabase
-        .from('sport_events')
-        .select(
-          'id, event_time, maps_url, latitude, longitude, location, notes, media_url, media_type'
-        )
-        .eq('user_id', user.id)
-        .eq('event_date', todayISO);
+      const { data: eventsData } = eventsRes;
 
       setSportEvents((eventsData as TimelineEventData[]) || []);
 
       // Tareas de hoy (módulo NOTAS): con hora, o asignadas desde un día anterior.
       // Las creadas hoy sin hora se quedan solo en NOTAS.
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-      const { data: tasksData } = await supabase
-        .from('user_tasks')
-        .select('id, content, due_time, is_done')
-        .eq('user_id', user.id)
-        .eq('task_date', localDateISO())
-        .or(`due_time.not.is.null,created_at.lt.${startOfToday.toISOString()}`);
+      const { data: tasksData } = tasksRes;
 
       setTimelineTasks((tasksData as TimelineTaskData[]) || []);
 
       // Fetch workout block position (both sessions)
-      const { data: posData, error: posError } = await supabase
-        .from('workout_block_position')
-        .select('position, session_index, scheduled_time')
-        .eq('user_id', user.id)
-        .order('session_index', { ascending: true });
+      const { data: posData, error: posError } = posRes;
 
       console.warn('🏋️ PLAN: Posiciones cargadas:', posData, posError);
       if (posData && posData.length > 0) {
@@ -634,11 +711,7 @@ function PlanScreen() {
       }
 
       // Fetch routine names (sistema weekday: 0=Dom..6=Sáb)
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('training_routine_names, training_session_names, workout_scheduled_times')
-        .eq('id', user.id)
-        .single();
+      const { data: profileData } = profileRes;
 
       // ── Horarios configurados por día (override del scheduled_time global) ──
       // Clave: `${weekday}_${sessionIdx}` → "HH:MM"
@@ -652,11 +725,7 @@ function PlanScreen() {
       // ===========================================================================
       // DETECTAR MODO DE ENTRENAMIENTO (external vs gym_module)
       // ===========================================================================
-      const { data: userProfileData } = await supabase
-        .from('user_profiles')
-        .select('training_mode, external_schedule')
-        .eq('user_id', user.id)
-        .single();
+      const { data: userProfileData } = userProfileRes;
 
       const trainingMode = userProfileData?.training_mode || 'none';
       const externalSchedule = userProfileData?.external_schedule || {};
@@ -699,28 +768,7 @@ function PlanScreen() {
       // ===========================================================================
       // CARGAR EJERCICIOS DEL DÍA ACTUAL (ambos modos)
       // ===========================================================================
-      const { data: userConfigs, error: exercisesError } = await supabase
-        .from('user_exercise_config')
-        .select(
-          `
-          id,
-          exercise_id,
-          training_days,
-          display_order,
-          custom_media_url,
-          session_index,
-          exercises (
-            id,
-          name,
-          default_media_url,
-          thumbnail_url,
-          video_url
-        )
-      `
-        )
-        .eq('user_id', user.id)
-        .order('display_order', { ascending: true, nullsFirst: false })
-        .order('created_at', { ascending: true });
+      const { data: userConfigs, error: exercisesError } = configsRes;
 
       // Mapear al formato simplificado
       const exercisesData =
@@ -839,24 +887,21 @@ function PlanScreen() {
       // ===========================================================================
       // SYNC NOTIFICATIONS - Actualizar recordatorios basados en el plan actual
       // ===========================================================================
-      try {
-        await syncNotifications(user.id);
-        console.log('🔔 PLAN: Notificaciones sincronizadas');
-      } catch (notifError) {
+      syncNotifications(user.id).catch((notifError: unknown) => {
         console.warn('⚠️ PLAN: Error sincronizando notificaciones:', notifError);
-      }
+      });
     } catch (error) {
       console.error('Error fetching plan data:', error);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
+      fetchInFlight.current = false;
+      if (fetchPending.current) {
+        fetchPending.current = false;
+        fetchData();
+      }
     }
-  }, [syncNotifications]);
-
-  // Cargar datos inicialmente
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  }, [syncNotifications, authUser]);
 
   // Recargar datos al volver a PLAN desde otro módulo
   useFocusEffect(
@@ -1214,15 +1259,20 @@ function PlanScreen() {
   };
 
   const handleToggleTask = async (task: TimelineTaskData) => {
-    const next = !task.is_done;
-    setTimelineTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, is_done: next } : t)));
-    const { error } = await supabase
-      .from('user_tasks')
-      .update({ is_done: next, updated_at: new Date().toISOString() })
-      .eq('id', task.id);
-    if (error) {
+    const res = await toggleTaskDone({
+      id: task.id,
+      is_done: task.is_done,
+      task_date: task.task_date || localDateISO(),
+      recurrence: task.recurrence,
+      recur_day: task.recur_day,
+    });
+    if (!res) return;
+    // Las recurrentes pasan al mes siguiente: salen del timeline de hoy
+    if (res.rolled) {
+      setTimelineTasks((prev) => prev.filter((t) => t.id !== task.id));
+    } else {
       setTimelineTasks((prev) =>
-        prev.map((t) => (t.id === task.id ? { ...t, is_done: task.is_done } : t))
+        prev.map((t) => (t.id === task.id ? { ...t, is_done: res.is_done } : t))
       );
     }
   };
@@ -2016,7 +2066,28 @@ function PlanScreen() {
     return finalTimeline;
   };
 
-  const timeline = buildTimeline();
+  const fullTimeline = buildTimeline();
+  const timeline =
+    filterTypes.length === 0 ? fullTimeline : fullTimeline.filter((i) => filterTypes.includes(i.type));
+
+  const countByType = (type: TimelineItem['type']) =>
+    fullTimeline.filter((i) => i.type === type).length;
+
+  const toggleFilterType = (type: TimelineItem['type']) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setFilterTypes((prev) => {
+      const next = prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type];
+      // Sin selección o con todos marcados equivale a "TODO"
+      return next.length === FILTER_OPTIONS.length ? [] : next;
+    });
+  };
+
+  const filterLabel =
+    filterTypes.length === 0
+      ? 'TODO'
+      : filterTypes.length === 1
+        ? FILTER_OPTIONS.find((o) => o.key === filterTypes[0])?.label || 'FILTRO'
+        : `${filterTypes.length} TIPOS`;
 
   // ============================================================================
   // AUTO-SCROLL: Calcular y scrollear al elemento que corresponde a la hora actual
@@ -2144,18 +2215,21 @@ function PlanScreen() {
   if (isLoading) {
     return (
       <View className="flex-1 bg-black items-center justify-center">
-        <Text className="text-white">Cargando plan...</Text>
+        <SavageBackground variant="screen" tone="mono" />
+        <ActivityIndicator size="large" color="#DC2626" />
       </View>
     );
   }
 
   return (
     <View className="flex-1 bg-black">
+      <SavageBackground variant="screen" tone="mono" />
+
       {/* Header - PREMIUM SAVAGE EDITION */}
       <View
         className="px-5 pt-14 pb-5"
         style={{
-          backgroundColor: '#000000',
+          backgroundColor: 'transparent',
           borderBottomWidth: 1,
           borderBottomColor: 'rgba(220, 38, 38, 0.3)',
           shadowColor: '#DC2626',
@@ -2198,7 +2272,133 @@ function PlanScreen() {
             HOY
           </Text>
         </View>
+
+        {/* Acciones de cabecera: agregar (scroll a las tarjetas de agregar) + filtro */}
+        <View className="absolute right-5 bottom-5 flex-row items-center gap-2">
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+          }}
+          className="flex-row items-center gap-1.5 px-3 py-2 rounded-xl active:scale-95"
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.06)',
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.12)',
+          }}
+        >
+          <Plus size={13} color="#A1A1AA" strokeWidth={3} />
+          <Text className="text-[11px] font-black tracking-widest" style={{ color: '#D4D4D8' }}>
+            AGREGAR
+          </Text>
+        </Pressable>
+
+        {/* Filtro por tipo de tarjeta */}
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setFilterOpen(true);
+          }}
+          className="flex-row items-center gap-1.5 px-3 py-2 rounded-xl active:scale-95"
+          style={{
+            backgroundColor: filterTypes.length > 0 ? 'rgba(220, 38, 38, 0.2)' : 'rgba(255, 255, 255, 0.06)',
+            borderWidth: 1,
+            borderColor: filterTypes.length > 0 ? 'rgba(220, 38, 38, 0.6)' : 'rgba(255, 255, 255, 0.12)',
+          }}
+        >
+          <Filter size={13} color={filterTypes.length > 0 ? '#DC2626' : '#A1A1AA'} />
+          <Text
+            className="text-[11px] font-black tracking-widest"
+            style={{ color: filterTypes.length > 0 ? '#DC2626' : '#D4D4D8' }}
+          >
+            {filterLabel}
+          </Text>
+          <ChevronDown size={13} color="#71717A" />
+        </Pressable>
+        </View>
       </View>
+
+      {/* Popout de selección de tipos */}
+      <Modal
+        visible={filterOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFilterOpen(false)}
+        statusBarTranslucent
+      >
+        <Pressable className="flex-1" onPress={() => setFilterOpen(false)}>
+          <Pressable
+            onPress={() => {}}
+            className="absolute right-5 w-64 rounded-2xl p-2"
+            style={{
+              top: 108,
+              backgroundColor: '#0a0a0a',
+              borderWidth: 1,
+              borderColor: 'rgba(220, 38, 38, 0.4)',
+              shadowColor: '#DC2626',
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.3,
+              shadowRadius: 16,
+              elevation: 12,
+            }}
+          >
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setFilterTypes([]);
+              }}
+              className="flex-row items-center gap-3 px-3 py-3 rounded-xl active:opacity-70"
+              style={{
+                backgroundColor: filterTypes.length === 0 ? 'rgba(220, 38, 38, 0.15)' : 'transparent',
+              }}
+            >
+              <View
+                className="w-5 h-5 rounded items-center justify-center"
+                style={{
+                  backgroundColor: filterTypes.length === 0 ? '#DC2626' : 'transparent',
+                  borderWidth: 1.5,
+                  borderColor: '#DC2626',
+                }}
+              >
+                {filterTypes.length === 0 && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
+              </View>
+              <Text className="flex-1 text-white text-xs font-black tracking-widest">TODO</Text>
+              <Text className="text-zinc-500 text-[11px] font-mono">{fullTimeline.length}</Text>
+            </Pressable>
+
+            <View className="h-[1px] bg-white/10 my-1" />
+
+            {FILTER_OPTIONS.map((opt) => {
+              const active = filterTypes.includes(opt.key);
+              return (
+                <Pressable
+                  key={opt.key}
+                  onPress={() => toggleFilterType(opt.key)}
+                  className="flex-row items-center gap-3 px-3 py-3 rounded-xl active:opacity-70"
+                  style={{ backgroundColor: active ? `${opt.color}22` : 'transparent' }}
+                >
+                  <View
+                    className="w-5 h-5 rounded items-center justify-center"
+                    style={{
+                      backgroundColor: active ? opt.color : 'transparent',
+                      borderWidth: 1.5,
+                      borderColor: opt.color,
+                    }}
+                  >
+                    {active && <Check size={13} color="#000000" strokeWidth={3} />}
+                  </View>
+                  <Text className="flex-1 text-white text-xs font-black tracking-widest">
+                    {opt.label}
+                  </Text>
+                  <Text className="text-zinc-500 text-[11px] font-mono">
+                    {countByType(opt.key)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Timeline */}
       <ScrollView
@@ -2237,9 +2437,13 @@ function PlanScreen() {
               >
                 <Plus size={32} color="#DC2626" />
               </View>
-              <Text className="text-white font-bold text-lg mb-1">Sin comidas configuradas</Text>
+              <Text className="text-white font-bold text-lg mb-1">
+                {fullTimeline.length > 0 ? 'Nada que mostrar' : 'Sin comidas configuradas'}
+              </Text>
               <Text className="text-zinc-400 text-sm text-center font-mono max-w-[240px]">
-                Agrega tu primera comida para comenzar tu plan metabólico
+                {fullTimeline.length > 0
+                  ? 'No hay tarjetas de los tipos seleccionados'
+                  : 'Agrega tu primera comida para comenzar tu plan metabólico'}
               </Text>
             </View>
           ) : (
@@ -2303,7 +2507,7 @@ function PlanScreen() {
                       onMoveDown={() => {}}
                       isFirst={true}
                       isLast={true}
-                      onPressRoutine={() => router.push('/(tabs)/gym')}
+                      onPressRoutine={() => router.push({ pathname: '/(tabs)/gym', params: { sport: 'GYM' } } as any)}
                       onTimeChange={(time) => handleWorkoutTimeChange(time, sessionIdx)}
                     />
                   </View>
@@ -2368,11 +2572,11 @@ function PlanScreen() {
           }}
           className="w-full py-5 mt-6 rounded-2xl active:scale-[0.98]"
           style={{
-            backgroundColor: 'rgba(39, 39, 42, 0.4)',
+            backgroundColor: 'rgba(255, 255, 255, 0.04)',
             borderWidth: 1.5,
             borderStyle: 'dashed',
-            borderColor: 'rgba(220, 38, 38, 0.4)',
-            shadowColor: '#DC2626',
+            borderColor: 'rgba(34, 197, 94, 0.4)',
+            shadowColor: '#22C55E',
             shadowOffset: { width: 0, height: 0 },
             shadowOpacity: 0.15,
             shadowRadius: 24,
@@ -2381,11 +2585,13 @@ function PlanScreen() {
           <View className="items-center">
             <View
               className="w-12 h-12 rounded-xl items-center justify-center mb-2"
-              style={{ backgroundColor: 'rgba(220, 38, 38, 0.15)' }}
+              style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)' }}
             >
-              <Plus size={24} color="#DC2626" />
+              <Plus size={24} color="#22C55E" />
             </View>
-            <Text className="text-red-500 font-bold tracking-widest text-sm">AGREGAR COMIDA</Text>
+            <Text style={{ color: '#22C55E' }} className="font-bold tracking-widest text-sm">
+              AGREGAR COMIDA
+            </Text>
             <Text className="text-zinc-500 text-[10px] font-mono mt-1">
               Nueva comida en tu plan
             </Text>
@@ -2401,7 +2607,7 @@ function PlanScreen() {
           }}
           className="w-full py-5 mt-3 rounded-2xl active:scale-[0.98]"
           style={{
-            backgroundColor: 'rgba(39, 39, 42, 0.4)',
+            backgroundColor: 'rgba(255, 255, 255, 0.04)',
             borderWidth: 1.5,
             borderStyle: 'dashed',
             borderColor: 'rgba(168, 85, 247, 0.4)',
@@ -2433,9 +2639,9 @@ function PlanScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setShowAddCardio(true);
           }}
-          className="w-full py-5 mt-3 mb-28 rounded-2xl active:scale-[0.98]"
+          className="w-full py-5 mt-3 rounded-2xl active:scale-[0.98]"
           style={{
-            backgroundColor: 'rgba(39, 39, 42, 0.4)',
+            backgroundColor: 'rgba(255, 255, 255, 0.04)',
             borderWidth: 1.5,
             borderStyle: 'dashed',
             borderColor: 'rgba(113, 113, 122, 0.4)',
@@ -2456,6 +2662,76 @@ function PlanScreen() {
               AGREGAR CARDIO
             </Text>
             <Text className="text-zinc-500 text-[10px] font-mono mt-1">Nuevo bloque de cardio</Text>
+          </View>
+        </Pressable>
+
+        {/* Add Task Button - RED (igual que las tarjetas de tarea) */}
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setShowAddTask(true);
+          }}
+          className="w-full py-5 mt-3 rounded-2xl active:scale-[0.98]"
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.04)',
+            borderWidth: 1.5,
+            borderStyle: 'dashed',
+            borderColor: 'rgba(220, 38, 38, 0.4)',
+            shadowColor: '#DC2626',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.15,
+            shadowRadius: 24,
+          }}
+        >
+          <View className="items-center">
+            <View
+              className="w-12 h-12 rounded-xl items-center justify-center mb-2"
+              style={{ backgroundColor: 'rgba(220, 38, 38, 0.15)' }}
+            >
+              <ListChecks size={24} color="#DC2626" />
+            </View>
+            <Text style={{ color: '#DC2626' }} className="font-bold tracking-widest text-sm">
+              AGREGAR TAREA
+            </Text>
+            <Text className="text-zinc-500 text-[10px] font-mono mt-1">Pendiente con día y hora</Text>
+          </View>
+        </Pressable>
+
+        {/* Add Event Button - BLUE (igual que las tarjetas de evento) */}
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            if (!planSport?.id) {
+              Alert.alert('Sin deporte activo', 'Selecciona un deporte para agendar un evento.');
+              return;
+            }
+            setShowAddEvent(true);
+          }}
+          className="w-full py-5 mt-3 mb-28 rounded-2xl active:scale-[0.98]"
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.04)',
+            borderWidth: 1.5,
+            borderStyle: 'dashed',
+            borderColor: 'rgba(14, 165, 233, 0.4)',
+            shadowColor: '#0EA5E9',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.15,
+            shadowRadius: 24,
+          }}
+        >
+          <View className="items-center">
+            <View
+              className="w-12 h-12 rounded-xl items-center justify-center mb-2"
+              style={{ backgroundColor: 'rgba(14, 165, 233, 0.15)' }}
+            >
+              <CalendarClock size={24} color="#0EA5E9" />
+            </View>
+            <Text style={{ color: '#0EA5E9' }} className="font-bold tracking-widest text-sm">
+              AGREGAR EVENTO
+            </Text>
+            <Text className="text-zinc-500 text-[10px] font-mono mt-1">
+              Reunión, sesión o cita con hora
+            </Text>
           </View>
         </Pressable>
       </ScrollView>
@@ -2516,7 +2792,6 @@ function PlanScreen() {
       <PlanNotesModal
         visible={showPlanNotes}
         onClose={() => setShowPlanNotes(false)}
-        initialTab="nutricion"
       />
 
       <AddCardioModal
@@ -2530,6 +2805,27 @@ function PlanScreen() {
         hasDualSession={hasDualSession}
         editData={editingCardioData}
       />
+
+      {authUser && (
+        <TaskEditorModal
+          visible={showAddTask}
+          onClose={() => setShowAddTask(false)}
+          userId={authUser.id}
+          onSaved={() => fetchData()}
+          onDeleted={() => {}}
+        />
+      )}
+
+      {authUser && planSport?.id && (
+        <AddSportEventModal
+          visible={showAddEvent}
+          onClose={() => setShowAddEvent(false)}
+          userId={authUser.id}
+          sportId={planSport.id}
+          onSaved={() => fetchData()}
+          onDeleted={() => {}}
+        />
+      )}
     </View>
   );
 }

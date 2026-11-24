@@ -5,6 +5,8 @@ export interface UserTask {
   due_time: string | null; // "HH:MM" 24h
   task_date: string; // YYYY-MM-DD (fecha local)
   is_done: boolean;
+  recurrence: 'monthly' | null;
+  recur_day: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -39,4 +41,19 @@ export function formatDateLabel(iso: string): string {
   if (iso === today) return 'HOY';
   if (iso === addDaysISO(today, 1)) return 'MAÑANA';
   return new Date(`${iso}T00:00:00`).toLocaleDateString('es', { day: '2-digit', month: 'short' });
+}
+
+/** Fecha del día `day` en el mes dado (0-11), recortada al último día si el mes es más corto. */
+export function clampMonthlyDate(year: number, monthIndex: number, day: number): string {
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  return localDateISO(new Date(year, monthIndex, Math.min(day, daysInMonth)));
+}
+
+/** Siguiente ocurrencia mensual posterior a hoy y a la fecha actual de la tarea. */
+export function nextMonthlyDate(taskDate: string, day: number): string {
+  const today = localDateISO();
+  const base = taskDate > today ? taskDate : today;
+  const [y, m] = base.split('-').map(Number);
+  const candidate = clampMonthlyDate(y, m - 1, day);
+  return candidate > base ? candidate : clampMonthlyDate(y, m, day);
 }

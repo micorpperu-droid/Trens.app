@@ -29,6 +29,7 @@ import { hankSpeakActions } from '../../lib/hankSpeakAction';
 import { speakSavage, stopSavage, prefetchSavage } from '../../services/tts/savageTTS';
 import { setHankChatOpen } from '../../lib/hankChatState';
 import { localDateISO } from '../notes/taskTypes';
+import { toggleTaskDone } from '../notes/taskActions';
 
 // ============================================================================
 // TYPES
@@ -240,7 +241,7 @@ const getTimeOfDayClosing = (hour: number, hasItems: boolean): string => {
 // ============================================================================
 // EXERCISE MINI CARD
 // ============================================================================
-const ExerciseMiniCard: React.FC<{ exercise: Exercise }> = ({ exercise }) => {
+export const ExerciseMiniCard: React.FC<{ exercise: Exercise }> = ({ exercise }) => {
   const videoPlayer = useVideoPlayer(exercise.videoUrl || null, (player) => {
     player.loop = false;
     player.muted = true;
@@ -513,7 +514,7 @@ const WorkoutTimelineCard: React.FC<{
       <Pressable
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          router.push('/(tabs)/gym');
+          router.push({ pathname: '/(tabs)/gym', params: { sport: 'GYM' } } as any);
         }}
         className="rounded-xl overflow-hidden active:scale-[0.98]"
         style={{
@@ -1036,7 +1037,7 @@ export const TodayCards: React.FC<TodayCardsProps> = ({ userId }) => {
       const [tasksRes, eventsRes] = await Promise.all([
         supabase
           .from('user_tasks')
-          .select('id, content, due_time')
+          .select('id, content, due_time, task_date, recurrence, recur_day')
           .eq('user_id', userId)
           .eq('task_date', todayISO)
           .eq('is_done', false)
@@ -1432,7 +1433,13 @@ export const TodayCards: React.FC<TodayCardsProps> = ({ userId }) => {
           time: timeStr || '99:99',
           minutes: timeStr ? parseTimeToMinutes(timeStr) : 9999,
           label: 'TAREA',
-          data: { id: t.id, content: t.content },
+          data: {
+            id: t.id,
+            content: t.content,
+            task_date: t.task_date,
+            recurrence: t.recurrence,
+            recur_day: t.recur_day,
+          },
         };
         if (timeStr) items.push(item);
         else untimedForced.push(item);
@@ -1770,14 +1777,20 @@ export const TodayCards: React.FC<TodayCardsProps> = ({ userId }) => {
     return () => clearInterval(interval);
   }, [timeline, buildNarrationText]);
 
-  const handleCompleteTask = useCallback(async (taskId: string) => {
-    setTimeline((prev) => prev.filter((i) => i.id !== `task-${taskId}`));
-    const { error } = await supabase
-      .from('user_tasks')
-      .update({ is_done: true, updated_at: new Date().toISOString() })
-      .eq('id', taskId);
-    if (error) console.error('Error completando tarea:', error);
-  }, []);
+  const handleCompleteTask = useCallback(
+    async (taskId: string) => {
+      const item = timeline.find((i) => i.id === `task-${taskId}`);
+      setTimeline((prev) => prev.filter((i) => i.id !== `task-${taskId}`));
+      await toggleTaskDone({
+        id: taskId,
+        is_done: false,
+        task_date: item?.data?.task_date || localDateISO(),
+        recurrence: item?.data?.recurrence,
+        recur_day: item?.data?.recur_day,
+      });
+    },
+    [timeline]
+  );
 
   useFocusEffect(
     useCallback(() => {

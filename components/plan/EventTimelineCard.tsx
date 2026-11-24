@@ -88,7 +88,7 @@ export const EventTimelineCard: React.FC<EventTimelineCardProps> = ({
       <View
         className="rounded-2xl overflow-hidden"
         style={{
-          backgroundColor: 'rgba(24, 24, 27, 0.95)',
+          backgroundColor: 'rgba(255, 255, 255, 0.05)',
           borderWidth: 1,
           borderColor: `${accentColor}35`,
           shadowColor: accentColor,

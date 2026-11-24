@@ -39,6 +39,7 @@ interface AddSportEventModalProps {
   userId: string;
   sportId: string;
   editingItem?: SportEvent | null;
+  defaultDate?: string;
   onSaved: (item: SportEvent) => void;
   onDeleted: (id: string) => void;
   accentColor?: string;
@@ -62,6 +63,7 @@ export function AddSportEventModal({
   editingItem,
   onSaved,
   onDeleted,
+  defaultDate,
   accentColor = '#0EA5E9',
 }: AddSportEventModalProps) {
   const { width: screenWidth } = useWindowDimensions();
@@ -86,7 +88,7 @@ export function AddSportEventModal({
 
   useEffect(() => {
     if (visible) {
-      setEventDate(editingItem?.event_date || todayISODate());
+      setEventDate(editingItem?.event_date || defaultDate || todayISODate());
       setEventTime(editingItem?.event_time || '07:00');
       setMapsUrl(editingItem?.maps_url || '');
       setAddress('');
@@ -100,7 +102,7 @@ export function AddSportEventModal({
       setMediaUri(null);
       setMediaType(editingItem?.media_type || 'PHOTO');
     }
-  }, [visible, editingItem]);
+  }, [visible, editingItem, defaultDate]);
 
   const handlePickLocation = (place: PickedPlace) => {
     setAddress(place.address);

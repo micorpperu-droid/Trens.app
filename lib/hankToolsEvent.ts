@@ -21,13 +21,22 @@ const listeners: Record<string, Set<Listener>> = {
   meals: new Set(),
   stack: new Set(),
   notes: new Set(),
+  add_task: new Set(),
+  add_event: new Set(),
 };
 
 // Eventos pendientes: si se emite y no hay listeners, se guarda para ejecución
 // inmediata cuando alguien se suscriba (ej: gym_structure al navegar al tab)
 const pending: Record<string, HankToolPayload | true> = {};
 
-export type HankToolType = 'shop' | 'gym_structure' | 'meals' | 'stack' | 'notes';
+export type HankToolType =
+  | 'shop'
+  | 'gym_structure'
+  | 'meals'
+  | 'stack'
+  | 'notes'
+  | 'add_task'
+  | 'add_event';
 
 export const hankToolsEvent = {
   /** Suscribirse a un evento de herramienta */

@@ -5,20 +5,22 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { ListChecks, Plus, StickyNote } from 'lucide-react-native';
+import { ListChecks, PenLine, Plus, StickyNote } from 'lucide-react-native';
 import { useAuth } from '../../_layout';
 import { supabase } from '../../../lib/supabase';
 import * as Haptics from '../../../lib/haptics';
 import { NoteEditorModal } from '../../../components/notes/NoteEditorModal';
 import { TaskEditorModal } from '../../../components/notes/TaskEditorModal';
 import { TasksList } from '../../../components/notes/TasksList';
+import { PizarraBoard } from '../../../components/notes/PizarraBoard';
+import { SavageBackground } from '../../../components/ui/SavageBackground';
 import { useUserTasks } from '../../../components/notes/useUserTasks';
 import { UserTask } from '../../../components/notes/taskTypes';
 import { UserNote, withAlpha } from '../../../components/notes/noteTheme';
 
 const RED = '#DC2626';
 
-type Mode = 'notes' | 'tasks';
+type Mode = 'notes' | 'tasks' | 'board';
 
 export default function NotasScreen() {
   const { user } = useAuth();
@@ -151,6 +153,8 @@ export default function NotasScreen() {
 
   return (
     <View className="flex-1 bg-black">
+      <SavageBackground variant="screen" tone="mono" />
+
       <View
         className="px-5 pt-14 pb-4"
         style={{
@@ -168,16 +172,18 @@ export default function NotasScreen() {
           <View className="flex-row items-center gap-2">
             <View className="w-2 h-2 rounded-full" style={{ backgroundColor: RED }} />
             <Text className="text-white text-2xl font-black tracking-tight uppercase">
-              {mode === 'notes' ? 'NOTAS' : 'TAREAS'}
+              {mode === 'notes' ? 'NOTAS' : mode === 'tasks' ? 'TAREAS' : 'PIZARRA'}
             </Text>
           </View>
-          <Pressable
-            onPress={openNew}
-            className="w-10 h-10 rounded-full items-center justify-center active:scale-95"
-            style={{ backgroundColor: RED }}
-          >
-            <Plus size={22} color="#FFFFFF" strokeWidth={3} />
-          </Pressable>
+          {mode !== 'board' && (
+            <Pressable
+              onPress={openNew}
+              className="w-10 h-10 rounded-full items-center justify-center active:scale-95"
+              style={{ backgroundColor: RED }}
+            >
+              <Plus size={22} color="#FFFFFF" strokeWidth={3} />
+            </Pressable>
+          )}
         </View>
 
         {/* Toggle Notas / Tareas */}
@@ -189,6 +195,7 @@ export default function NotasScreen() {
             [
               { key: 'notes', label: 'NOTAS', Icon: StickyNote },
               { key: 'tasks', label: 'TAREAS', Icon: ListChecks },
+              { key: 'board', label: 'PIZARRA', Icon: PenLine },
             ] as const
           ).map(({ key, label, Icon }) => {
             const active = mode === key;
@@ -220,7 +227,9 @@ export default function NotasScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={RED} />
         }
       >
-        {mode === 'notes' ? (
+        {mode === 'board' ? (
+          <PizarraBoard />
+        ) : mode === 'notes' ? (
           !loading && notes.length === 0 ? (
             renderEmpty('Sin notas', 'Toca + para crear tu primera nota', StickyNote)
           ) : (

@@ -3,19 +3,37 @@
 // y muestra abajo el detalle del día seleccionado (hoy por defecto)
 // ============================================================================
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import {
+  CalendarClock,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  ListChecks,
+  Pill,
+} from 'lucide-react-native';
 import { useAuth } from '../../_layout';
 import { supabase } from '../../../lib/supabase';
 import * as Haptics from '../../../lib/haptics';
-import { UserTask, localDateISO } from '../../../components/notes/taskTypes';
+import { UserTask, clampMonthlyDate, localDateISO } from '../../../components/notes/taskTypes';
+import { toggleTaskDone } from '../../../components/notes/taskActions';
+import { SavageBackground } from '../../../components/ui/SavageBackground';
+import { GlassCard } from '../../../components/ui/GlassCard';
+import { Alert } from '../../../lib/alert';
+import { hankToolsEvent } from '../../../lib/hankToolsEvent';
+import { useHank } from '../../../context/HankContext';
+import { useSport } from '../../../context/SportContext';
+import { TaskEditorModal } from '../../../components/notes/TaskEditorModal';
+import { AddSportEventModal } from '../../../components/sport/AddSportEventModal';
+import { StackDayCard, StackRow } from '../../../components/plan/StackDayCard';
 import { EventTimelineCard, TimelineEventData } from '../../../components/plan/EventTimelineCard';
 import { TaskTimelineCard, TimelineTaskData } from '../../../components/plan/TaskTimelineCard';
 
 const RED = '#DC2626';
 const EVENT_BLUE = '#0EA5E9';
+const STACK_PURPLE = '#A855F7';
 const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
 type MonthEvent = TimelineEventData & { event_date: string };
@@ -25,12 +43,18 @@ const isoOf = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}
 
 export default function MesScreen() {
   const { user } = useAuth();
+  const { activeSport } = useSport();
+  const { refreshTrigger } = useHank();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth()); // 0-11
   const [selected, setSelected] = useState(localDateISO());
   const [tasks, setTasks] = useState<UserTask[]>([]);
+  const [recurring, setRecurring] = useState<UserTask[]>([]);
   const [events, setEvents] = useState<MonthEvent[]>([]);
+  const [stackRows, setStackRows] = useState<StackRow[]>([]);
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [showAddEvent, setShowAddEvent] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const today = localDateISO();
@@ -42,7 +66,7 @@ export default function MesScreen() {
     const start = isoOf(year, month, 1);
     const end = isoOf(year, month, daysInMonth);
 
-    const [tasksRes, eventsRes] = await Promise.all([
+    const [tasksRes, eventsRes, recurringRes, stackRes] = await Promise.all([
       supabase
         .from('user_tasks')
         .select('*')
@@ -57,10 +81,24 @@ export default function MesScreen() {
         .eq('user_id', user.id)
         .gte('event_date', start)
         .lte('event_date', end),
+      supabase
+        .from('user_tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('recurrence', 'monthly'),
+      supabase
+        .from('supplement_stack')
+        .select(
+          'id, name, dose, type, time, times, days_of_week, is_pre_workout, is_post_workout'
+        )
+        .eq('user_id', user.id)
+        .eq('is_active', true),
     ]);
 
     if (tasksRes.error) console.error('Error cargando tareas del mes:', tasksRes.error);
     else setTasks((tasksRes.data as UserTask[]) || []);
+    if (!recurringRes.error) setRecurring((recurringRes.data as UserTask[]) || []);
+    if (!stackRes.error) setStackRows((stackRes.data as StackRow[]) || []);
     if (eventsRes.error) console.error('Error cargando eventos del mes:', eventsRes.error);
     else setEvents((eventsRes.data as MonthEvent[]) || []);
   }, [user, year, month, daysInMonth]);
@@ -71,23 +109,54 @@ export default function MesScreen() {
     }, [fetchMonth])
   );
 
+  // Se actualiza cuando HOY/Stack/Hank modifican datos
+  useEffect(() => {
+    if (refreshTrigger > 0) fetchMonth();
+  }, [refreshTrigger, fetchMonth]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchMonth();
     setRefreshing(false);
   };
 
+  // Tareas del mes + ocurrencias futuras de las recurrentes (solo la actual se puede completar)
+  const monthTasks = useMemo(() => {
+    const realIds = new Set(tasks.map((t) => t.id));
+    const virtual: UserTask[] = [];
+    recurring.forEach((r) => {
+      if (realIds.has(r.id)) return;
+      const day = r.recur_day || Number(r.task_date.slice(8, 10));
+      const date = clampMonthlyDate(year, month, day);
+      if (date >= r.task_date) {
+        virtual.push({ ...r, id: `${r.id}@${date}`, task_date: date, is_done: false });
+      }
+    });
+    return [...tasks, ...virtual];
+  }, [tasks, recurring, year, month]);
+
   const tasksByDate = useMemo(() => {
     const map: Record<string, UserTask[]> = {};
-    tasks.forEach((t) => (map[t.task_date] ||= []).push(t));
+    monthTasks.forEach((t) => (map[t.task_date] ||= []).push(t));
     return map;
-  }, [tasks]);
+  }, [monthTasks]);
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, MonthEvent[]> = {};
     events.forEach((e) => (map[e.event_date] ||= []).push(e));
     return map;
   }, [events]);
+
+  // Compuestos del stack que tocan cada día del mes (según los días de la semana configurados)
+  const stackByDate = useMemo(() => {
+    const map: Record<string, StackRow[]> = {};
+    for (let d = 1; d <= daysInMonth; d++) {
+      const weekday = new Date(year, month, d).getDay();
+      const items = stackRows.filter((r) => r.days_of_week?.includes(weekday) ?? true);
+      if (items.length > 0) map[isoOf(year, month, d)] = items;
+    }
+    return map;
+  }, [stackRows, year, month, daysInMonth]);
 
   const changeMonth = (delta: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -106,15 +175,37 @@ export default function MesScreen() {
   };
 
   const toggleTask = async (task: TimelineTaskData) => {
-    const next = !task.is_done;
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, is_done: next } : t)));
-    const { error } = await supabase
-      .from('user_tasks')
-      .update({ is_done: next, updated_at: new Date().toISOString() })
-      .eq('id', task.id);
-    if (error) {
-      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, is_done: task.is_done } : t)));
+    // Las ocurrencias futuras de tareas recurrentes no se completan desde aquí
+    if (String(task.id).includes('@')) return;
+    const row = tasks.find((t) => t.id === task.id);
+    if (!row) return;
+    const res = await toggleTaskDone(row);
+    if (!res) return;
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === row.id ? { ...t, task_date: res.task_date, is_done: res.is_done } : t
+      )
+    );
+    if (res.rolled) fetchMonth();
+  };
+
+  const openAddTask = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowAddTask(true);
+  };
+
+  const openAddEvent = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!activeSport?.id) {
+      Alert.alert('Sin deporte activo', 'Selecciona un deporte para agendar un evento.');
+      return;
     }
+    setShowAddEvent(true);
+  };
+
+  const openAddStack = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hankToolsEvent.open('stack', { view: 'add' });
   };
 
   if (!user) {
@@ -138,6 +229,7 @@ export default function MesScreen() {
 
   const selectedTasks = [...(tasksByDate[selected] || [])];
   const selectedEvents = [...(eventsByDate[selected] || [])];
+  const selectedStack = stackByDate[selected] || [];
   const dayItems = [
     ...selectedTasks.map((t) => ({ kind: 'task' as const, time: t.due_time || '', task: t })),
     ...selectedEvents.map((e) => ({ kind: 'event' as const, time: e.event_time || '', event: e })),
@@ -147,11 +239,13 @@ export default function MesScreen() {
     .toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })
     .toUpperCase();
 
-  const monthTaskCount = tasks.length;
+  const monthTaskCount = monthTasks.length;
   const monthEventCount = events.length;
 
   return (
     <View className="flex-1 bg-black">
+      <SavageBackground variant="screen" tone="mono" />
+
       <View
         className="px-5 pt-14 pb-4"
         style={{
@@ -190,7 +284,7 @@ export default function MesScreen() {
         }
       >
         {/* Calendario */}
-        <View className="px-5 pt-5">
+        <GlassCard className="mx-5 mt-5 px-3 pt-3 pb-3">
           <View className="flex-row items-center justify-between mb-1">
             <Pressable
               onPress={() => changeMonth(-1)}
@@ -203,7 +297,7 @@ export default function MesScreen() {
               <Text className="text-white font-black tracking-widest">{monthTitle}</Text>
               <Text className="text-zinc-500 text-[10px] font-mono mt-0.5">
                 {monthTaskCount} {monthTaskCount === 1 ? 'TAREA' : 'TAREAS'} · {monthEventCount}{' '}
-                {monthEventCount === 1 ? 'EVENTO' : 'EVENTOS'}
+                {monthEventCount === 1 ? 'EVENTO' : 'EVENTOS'} · {stackRows.length} STACK
               </Text>
             </View>
             <Pressable
@@ -231,6 +325,7 @@ export default function MesScreen() {
               const iso = isoOf(year, month, day);
               const dayTasks = tasksByDate[iso] || [];
               const dayEvents = eventsByDate[iso] || [];
+              const dayStack = stackByDate[iso];
               const total = dayTasks.length + dayEvents.length;
               const allTasksDone = dayTasks.length > 0 && dayTasks.every((t) => t.is_done);
               const isSelected = iso === selected;
@@ -276,6 +371,12 @@ export default function MesScreen() {
                           style={{ backgroundColor: isSelected ? '#FFFFFF' : EVENT_BLUE }}
                         />
                       )}
+                      {!!dayStack && (
+                        <View
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: isSelected ? '#FFFFFF' : STACK_PURPLE }}
+                        />
+                      )}
                     </View>
                   </View>
                   {total > 1 && (
@@ -300,39 +401,102 @@ export default function MesScreen() {
               <View className="w-2 h-2 rounded-full" style={{ backgroundColor: EVENT_BLUE }} />
               <Text className="text-zinc-500 text-[10px] font-bold tracking-widest">EVENTOS</Text>
             </View>
+            <View className="flex-row items-center gap-1.5">
+              <View className="w-2 h-2 rounded-full" style={{ backgroundColor: STACK_PURPLE }} />
+              <Text className="text-zinc-500 text-[10px] font-bold tracking-widest">STACK</Text>
+            </View>
           </View>
-        </View>
+
+          {/* Agregar al día seleccionado */}
+          <View className="flex-row gap-2 mt-4">
+            {[
+              { key: 'task', label: 'TAREA', color: RED, Icon: ListChecks, onPress: openAddTask },
+              {
+                key: 'event',
+                label: 'EVENTO',
+                color: EVENT_BLUE,
+                Icon: CalendarClock,
+                onPress: openAddEvent,
+              },
+              { key: 'stack', label: 'STACK', color: STACK_PURPLE, Icon: Pill, onPress: openAddStack },
+            ].map(({ key, label, color, Icon, onPress }) => (
+              <Pressable
+                key={key}
+                onPress={onPress}
+                className="flex-1 items-center py-3 rounded-2xl active:scale-95"
+                style={{
+                  backgroundColor: `${color}14`,
+                  borderWidth: 1,
+                  borderColor: `${color}55`,
+                }}
+              >
+                <Icon size={18} color={color} />
+                <Text className="text-zinc-500 text-[8px] font-bold tracking-widest mt-1.5">
+                  AGREGAR
+                </Text>
+                <Text className="text-xs font-black tracking-widest" style={{ color }}>
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </GlassCard>
 
         {/* Detalle del día */}
         <View className="px-5 pt-6">
           <Text className="text-white font-black tracking-widest text-sm">{selectedTitle}</Text>
           <Text className="text-zinc-500 text-[10px] font-mono mt-0.5 mb-4">
             {selectedTasks.length} {selectedTasks.length === 1 ? 'TAREA' : 'TAREAS'} ·{' '}
-            {selectedEvents.length} {selectedEvents.length === 1 ? 'EVENTO' : 'EVENTOS'}
+            {selectedEvents.length} {selectedEvents.length === 1 ? 'EVENTO' : 'EVENTOS'} ·{' '}
+            {selectedStack.length} STACK
           </Text>
 
-          {dayItems.length === 0 ? (
+          {dayItems.length === 0 && selectedStack.length === 0 ? (
             <View className="items-center py-10">
               <CalendarDays size={32} color="#3F3F46" />
               <Text className="text-zinc-500 text-sm font-mono mt-3">
-                Sin tareas ni eventos este día
+                Sin tareas, eventos ni stack este día
               </Text>
             </View>
           ) : (
-            dayItems.map((item) =>
-              item.kind === 'task' ? (
-                <TaskTimelineCard
-                  key={`t-${item.task.id}`}
-                  task={item.task}
-                  onToggle={toggleTask}
-                />
-              ) : (
-                <EventTimelineCard key={`e-${item.event.id}`} event={item.event} />
-              )
-            )
+            <>
+              {dayItems.map((item) =>
+                item.kind === 'task' ? (
+                  <TaskTimelineCard
+                    key={`t-${item.task.id}`}
+                    task={item.task}
+                    onToggle={toggleTask}
+                  />
+                ) : (
+                  <EventTimelineCard key={`e-${item.event.id}`} event={item.event} />
+                )
+              )}
+              {selectedStack.length > 0 && <StackDayCard items={selectedStack} />}
+            </>
           )}
         </View>
       </ScrollView>
+
+      <TaskEditorModal
+        visible={showAddTask}
+        onClose={() => setShowAddTask(false)}
+        userId={user.id}
+        defaultDate={selected}
+        onSaved={() => fetchMonth()}
+        onDeleted={() => {}}
+      />
+
+      {activeSport && (
+        <AddSportEventModal
+          visible={showAddEvent}
+          onClose={() => setShowAddEvent(false)}
+          userId={user.id}
+          sportId={activeSport.id}
+          defaultDate={selected}
+          onSaved={() => fetchMonth()}
+          onDeleted={() => {}}
+        />
+      )}
     </View>
   );
 }

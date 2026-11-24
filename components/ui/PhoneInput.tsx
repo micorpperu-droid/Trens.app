@@ -77,6 +77,8 @@ interface PhoneInputProps {
   placeholder?: string;
   disabled?: boolean;
   error?: boolean;
+  /** Sin fondo ni borde redondeado: el contenedor externo aporta la forma (landing angular). */
+  angular?: boolean;
 }
 
 // ============================================================================
@@ -90,6 +92,7 @@ export function PhoneInput({
   placeholder = '999 999 999',
   disabled = false,
   error = false,
+  angular = false,
 }: PhoneInputProps) {
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,9 +121,13 @@ export function PhoneInput({
   return (
     <>
       <View
-        className={`flex-row items-center bg-zinc-800 rounded-xl border ${
-          error ? 'border-red-500' : 'border-zinc-700'
-        }`}
+        className={
+          angular
+            ? 'flex-row items-center'
+            : `flex-row items-center bg-zinc-800 rounded-xl border ${
+                error ? 'border-red-500' : 'border-zinc-700'
+              }`
+        }
       >
         {/* Country Selector */}
         <TouchableOpacity

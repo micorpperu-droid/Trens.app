@@ -40,10 +40,10 @@ import {
   Check,
   X,
   Settings2,
-  Dumbbell,
-  Utensils,
-  Pill,
-  StickyNote,
+  Plus,
+  PenLine,
+  ListChecks,
+  CalendarClock,
   Music,
   SkipForward,
   RotateCcw,
@@ -78,6 +78,9 @@ import { QuickMealsModal } from './QuickMealsModal';
 import { QuickStackModal } from './QuickStackModal';
 import { Image } from 'expo-image';
 import { PlanNotesModal } from '../plan/PlanNotesModal';
+import { TaskEditorModal } from '../notes/TaskEditorModal';
+import { AddSportEventModal } from '../sport/AddSportEventModal';
+import { Alert as CrossAlert } from '../../lib/alert';
 import ShopModal from '../shop/ShopModal';
 
 // ============================================================================
@@ -133,15 +136,28 @@ const HANK_TOOLS: Array<{
     color: '#DC2626',
     label: 'Tienda',
   },
+];
+
+// Píldoras del menú Agregar (de arriba hacia abajo)
+const ADD_PILLS: Array<{
+  id: HankToolType;
+  label: string;
+  color: string;
+  icon: React.ReactNode;
+}> = [
+  { id: 'notes', label: 'Pizarra', color: '#EAB308', icon: <PenLine size={15} color="#EAB308" /> },
   {
-    id: 'gym_structure',
-    icon: <Dumbbell size={18} color="#DC2626" />,
+    id: 'add_task',
+    label: 'Agregar tarea',
     color: '#DC2626',
-    label: 'Entreno',
+    icon: <ListChecks size={15} color="#DC2626" />,
   },
-  { id: 'meals', icon: <Utensils size={18} color="#22c55e" />, color: '#22c55e', label: 'Comidas' },
-  { id: 'stack', icon: <Pill size={18} color="#a855f7" />, color: '#a855f7', label: 'Stack' },
-  { id: 'notes', icon: <StickyNote size={18} color="#f59e0b" />, color: '#f59e0b', label: 'Notas' },
+  {
+    id: 'add_event',
+    label: 'Agregar evento',
+    color: '#0EA5E9',
+    icon: <CalendarClock size={15} color="#0EA5E9" />,
+  },
 ];
 
 const HankFAB: React.FC<{
@@ -414,6 +430,7 @@ const HankFAB: React.FC<{
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolsOpenRef = useRef(false);
   const toolsFanProgress = useSharedValue(0);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
 
   // Animated values for drag feedback
   const fabDragX = useSharedValue(0);
@@ -439,6 +456,7 @@ const HankFAB: React.FC<{
   }, [toolsFanProgress]);
 
   const closeTools = useCallback(() => {
+    setAddMenuOpen(false);
     toolsFanProgress.value = withTiming(0, { duration: 200, easing: Easing.in(Easing.ease) });
     toolsOpenRef.current = false;
     setTimeout(() => setToolsOpen(false), 220);
@@ -473,8 +491,8 @@ const HankFAB: React.FC<{
     })
   );
 
-  // HANK chat button animated style (slot above last tool: index 4 + 2 = slot 6)
-  const hankToolButtonStyle = useAnimatedStyle(() => {
+  // Botón Agregar: slot justo encima de la última herramienta
+  const addToolButtonStyle = useAnimatedStyle(() => {
     const spacing = 68;
     const targetY = -(spacing * (HANK_TOOLS.length + 2));
     return {
@@ -772,14 +790,69 @@ const HankFAB: React.FC<{
         bottom: bottomOffset,
         right: rightOffset,
         zIndex: 1000,
-        width: 76,
-        height: toolsOpen ? 630 : 60,
-        alignItems: 'center',
-        justifyContent: 'flex-end',
+        width: toolsOpen && addMenuOpen ? 76 + 200 : 76,
+        height: toolsOpen ? 340 : 60,
       }}
       pointerEvents="box-none"
     >
-      {/* TOOLS FAN - 5 buttons appearing above Hank on swipe up */}
+      {/* Menú Agregar: píldoras a la izquierda del botón Agregar */}
+      {toolsOpen && addMenuOpen && (
+        <View
+          style={{
+            position: 'absolute',
+            right: 84,
+            bottom: 171,
+            alignItems: 'flex-end',
+            gap: 8,
+            zIndex: 1002,
+          }}
+          pointerEvents="box-none"
+        >
+          {ADD_PILLS.map((pill) => (
+            <Pressable
+              key={pill.id}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                closeTools();
+                setTimeout(() => hankToolsEvent.open(pill.id), 250);
+              }}
+              style={{
+                height: 38,
+                paddingHorizontal: 14,
+                borderRadius: 19,
+                backgroundColor: '#0a0a0a',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 7,
+                borderWidth: 1.5,
+                borderColor: `${pill.color}60`,
+                shadowColor: pill.color,
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.4,
+                shadowRadius: 8,
+                elevation: 8,
+              }}
+            >
+              {pill.icon}
+              <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>{pill.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
+      <View
+        style={{
+          position: 'absolute',
+          right: 0,
+          bottom: 0,
+          width: 76,
+          height: '100%',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+        }}
+        pointerEvents="box-none"
+      >
+      {/* TOOLS FAN - Spotify, Tienda y Agregar sobre el FAB */}
 
       {/* SPOTIFY CLONE - Slot 0 (más cercano a Hank) */}
       {toolsOpen && (
@@ -987,7 +1060,7 @@ const HankFAB: React.FC<{
           </Animated.View>
         ))}
 
-      {/* HANK CHAT - Botón más alto del fan */}
+      {/* AGREGAR - Botón sobre Tienda; abre las píldoras a su izquierda */}
       {toolsOpen && (
         <Animated.View
           style={[
@@ -997,32 +1070,31 @@ const HankFAB: React.FC<{
               left: 6,
               zIndex: 1001,
             },
-            hankToolButtonStyle,
+            addToolButtonStyle,
           ]}
         >
           <Pressable
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-              closeTools();
-              setTimeout(() => onPressRef.current(), 250);
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setAddMenuOpen((prev) => !prev);
             }}
             style={{
               width: 52,
               height: 52,
               borderRadius: 26,
-              backgroundColor: '#0a0a0a',
+              backgroundColor: addMenuOpen ? '#EAB308' : '#0a0a0a',
               alignItems: 'center',
               justifyContent: 'center',
               borderWidth: 1.5,
-              borderColor: '#F9731640',
-              shadowColor: '#F97316',
+              borderColor: '#EAB30840',
+              shadowColor: '#EAB308',
               shadowOffset: { width: 0, height: 0 },
               shadowOpacity: 0.4,
               shadowRadius: 8,
               elevation: 8,
             }}
           >
-            <Bot size={18} color="#F97316" />
+            <Plus size={20} color={addMenuOpen ? '#000000' : '#EAB308'} strokeWidth={2.5} />
           </Pressable>
           <Text
             style={{
@@ -1034,7 +1106,7 @@ const HankFAB: React.FC<{
               letterSpacing: 0.5,
             }}
           >
-            HANK
+            AGREGAR
           </Text>
         </Animated.View>
       )}
@@ -1203,6 +1275,7 @@ const HankFAB: React.FC<{
           </Animated.View>
         </Animated.View>
       </Animated.View>
+      </View>
     </View>
   );
 };
@@ -1756,7 +1829,9 @@ export const HankOverlay: React.FC = () => {
   const { canSave } = useSaveGuard();
 
   // Sport context para detectar primera vez
-  const { isFirstTime } = useSport();
+  const { isFirstTime, activeSport } = useSport();
+  const activeSportRef = useRef(activeSport);
+  activeSportRef.current = activeSport;
 
   const [isOpen, setIsOpen] = useState(false);
   const [inputText, setInputText] = useState('');
@@ -1766,7 +1841,10 @@ export const HankOverlay: React.FC = () => {
   const [takeoverStatus, setTakeoverStatus] = useState('');
   const [showQuickMeals, setShowQuickMeals] = useState(false);
   const [showQuickStack, setShowQuickStack] = useState(false);
+  const [quickStackView, setQuickStackView] = useState<'list' | 'add'>('list');
   const [showQuickNotes, setShowQuickNotes] = useState(false);
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [showAddEvent, setShowAddEvent] = useState(false);
   const [pendingExecution, setPendingExecution] = useState<{
     text: string;
     toolCalls: HankToolCall[];
@@ -1780,8 +1858,19 @@ export const HankOverlay: React.FC = () => {
   useEffect(() => {
     const unsubs = [
       hankToolsEvent.subscribe('meals', () => setShowQuickMeals(true)),
-      hankToolsEvent.subscribe('stack', () => setShowQuickStack(true)),
+      hankToolsEvent.subscribe('stack', (payload) => {
+        setQuickStackView((payload as { view?: string } | undefined)?.view === 'add' ? 'add' : 'list');
+        setShowQuickStack(true);
+      }),
       hankToolsEvent.subscribe('notes', () => setShowQuickNotes(true)),
+      hankToolsEvent.subscribe('add_task', () => setShowAddTask(true)),
+      hankToolsEvent.subscribe('add_event', () => {
+        if (!activeSportRef.current) {
+          CrossAlert.alert('Sin deporte activo', 'Selecciona un deporte para agendar un evento.');
+          return;
+        }
+        setShowAddEvent(true);
+      }),
     ];
     return () => unsubs.forEach((u) => u());
   }, []);
@@ -2046,6 +2135,7 @@ export const HankOverlay: React.FC = () => {
     clearConversation,
     saveMessageToSupabase,
     targetState,
+    triggerRefresh,
   } = useHank();
 
   // Voice input hook
@@ -3142,20 +3232,38 @@ export const HankOverlay: React.FC = () => {
       <QuickMealsModal visible={showQuickMeals} onClose={() => setShowQuickMeals(false)} />
 
       {/* Quick Stack Modal - opened from Hank Tools fan */}
-      <QuickStackModal visible={showQuickStack} onClose={() => setShowQuickStack(false)} />
+      <QuickStackModal
+        visible={showQuickStack}
+        initialViewMode={quickStackView}
+        onClose={() => {
+          setShowQuickStack(false);
+          triggerRefresh();
+        }}
+      />
 
       {/* Plan Notes Modal - opened from Hank Tools fan */}
-      <PlanNotesModal
-        visible={showQuickNotes}
-        onClose={() => setShowQuickNotes(false)}
-        initialTab={
-          pathname?.includes('/plan')
-            ? 'nutricion'
-            : pathname?.includes('/gym')
-              ? 'entrenamiento'
-              : 'pizarra'
-        }
-      />
+      <PlanNotesModal visible={showQuickNotes} onClose={() => setShowQuickNotes(false)} />
+
+      {/* Agregar tarea / evento - desde el menú Agregar del fan */}
+      {userId && (
+        <TaskEditorModal
+          visible={showAddTask}
+          onClose={() => setShowAddTask(false)}
+          userId={userId}
+          onSaved={() => triggerRefresh()}
+          onDeleted={() => {}}
+        />
+      )}
+      {userId && activeSport && (
+        <AddSportEventModal
+          visible={showAddEvent}
+          onClose={() => setShowAddEvent(false)}
+          userId={userId}
+          sportId={activeSport.id}
+          onSaved={() => triggerRefresh()}
+          onDeleted={() => {}}
+        />
+      )}
 
       {/* Chat Panel Modal */}
       <Modal visible={isOpen} transparent={true} animationType="slide" onRequestClose={handleClose}>

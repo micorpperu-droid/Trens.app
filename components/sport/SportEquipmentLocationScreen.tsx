@@ -5,7 +5,7 @@
 // ============================================================================
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, RefreshControl, Platform } from 'react-native';
+import { View, Text, ScrollView, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../app/_layout';
 import { supabase } from '../../lib/supabase';
@@ -14,6 +14,7 @@ import type { Sport, Equipment, SportLocation } from '../../types/sport';
 import type { SportEvent } from '../../types/sport';
 import type { Weekday } from '../../lib/weekday';
 import { HorizontalCardSlider16x9 } from './HorizontalCardSlider16x9';
+import { SavageBackground } from '../ui/SavageBackground';
 import { EquipmentCard } from './EquipmentCard';
 import { LocationCard } from './LocationCard';
 import { AddEquipmentModal } from './AddEquipmentModal';
@@ -161,10 +162,11 @@ export function SportEquipmentLocationScreen({ sport }: SportEquipmentLocationSc
 
   return (
     <View className="flex-1 bg-black">
+      <SavageBackground variant="screen" tone="mono" />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingTop: insets.top + (Platform.OS === 'web' ? 24 : 64),
+          paddingTop: insets.top + 24,
           paddingBottom: 140,
         }}
         refreshControl={

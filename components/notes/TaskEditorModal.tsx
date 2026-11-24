@@ -5,7 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, Platform } from 'react-native';
-import { Calendar, Clock, Trash2, X } from 'lucide-react-native';
+import { Calendar, Check, Clock, Repeat, Trash2, X } from 'lucide-react-native';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { TimePickerModal } from '../plan/TimePickerModal';
 import { Alert } from '../../lib/alert';
@@ -27,6 +27,7 @@ interface TaskEditorModalProps {
   onClose: () => void;
   userId: string;
   editingTask?: UserTask | null;
+  defaultDate?: string;
   onSaved: (task: UserTask) => void;
   onDeleted: (id: string) => void;
 }
@@ -36,12 +37,14 @@ export function TaskEditorModal({
   onClose,
   userId,
   editingTask,
+  defaultDate,
   onSaved,
   onDeleted,
 }: TaskEditorModalProps) {
   const [content, setContent] = useState('');
   const [date, setDate] = useState(localDateISO());
   const [time, setTime] = useState<string | null>(null);
+  const [monthly, setMonthly] = useState(false);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [nativeDatePicker, setNativeDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -53,10 +56,11 @@ export function TaskEditorModal({
   useEffect(() => {
     if (visible) {
       setContent(editingTask?.content || '');
-      setDate(editingTask?.task_date || localDateISO());
+      setDate(editingTask?.task_date || defaultDate || localDateISO());
       setTime(editingTask?.due_time || null);
+      setMonthly(editingTask?.recurrence === 'monthly');
     }
-  }, [visible, editingTask]);
+  }, [visible, editingTask, defaultDate]);
 
   const handleSave = async () => {
     if (!content.trim()) {
@@ -71,6 +75,8 @@ export function TaskEditorModal({
         content: content.trim(),
         due_time: time,
         task_date: date,
+        recurrence: monthly ? 'monthly' : null,
+        recur_day: monthly ? Number(date.slice(8, 10)) : null,
         updated_at: new Date().toISOString(),
       };
 
@@ -271,6 +277,40 @@ export function TaskEditorModal({
                 : `Aparecerá en tu timeline de HOY el día ${formatDateLabel(date).toLowerCase()}.`}
             </Text>
           </View>
+
+          {/* Recurrencia mensual */}
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setMonthly((prev) => !prev);
+            }}
+            className="flex-row items-center gap-3 rounded-xl px-4 py-3 active:scale-[0.98]"
+            style={{
+              backgroundColor: monthly ? 'rgba(220, 38, 38, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+              borderWidth: 1,
+              borderColor: monthly ? 'rgba(220, 38, 38, 0.5)' : 'rgba(255, 255, 255, 0.1)',
+            }}
+          >
+            <View
+              className="w-5 h-5 rounded items-center justify-center"
+              style={{
+                backgroundColor: monthly ? RED : 'transparent',
+                borderWidth: 1.5,
+                borderColor: RED,
+              }}
+            >
+              {monthly && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
+            </View>
+            <Repeat size={15} color={monthly ? RED : '#A1A1AA'} />
+            <View className="flex-1">
+              <Text className="text-white text-xs font-black tracking-widest">REPETIR CADA MES</Text>
+              <Text className="text-zinc-500 text-[11px] mt-0.5">
+                {monthly
+                  ? `Se repite el día ${Number(date.slice(8, 10))} de cada mes`
+                  : 'Solo una vez'}
+              </Text>
+            </View>
+          </Pressable>
 
           <View className="flex-row gap-3 mt-2">
             {isEditing && (

@@ -175,7 +175,7 @@ const NotificationBanner: React.FC<NotificationBannerProps> = ({
           router.push('/(tabs)/plan');
           break;
         case 'workout':
-          router.push('/(tabs)/gym');
+          router.push({ pathname: '/(tabs)/gym', params: { sport: 'GYM' } } as any);
           break;
       }
     }, 250);
@@ -417,7 +417,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
         } else if (data?.type === 'meal' || data?.type === 'supplement') {
           router.push('/(tabs)/plan');
         } else if (data?.type === 'workout') {
-          router.push('/(tabs)/gym');
+          router.push({ pathname: '/(tabs)/gym', params: { sport: 'GYM' } } as any);
         }
       }
     );

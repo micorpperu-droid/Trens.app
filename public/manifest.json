@@ -1,7 +1,7 @@
 {
-  "name": "TRENS - High Performance Fitness",
+  "name": "TRENS - Sistema de alto rendimiento",
   "short_name": "TRENS",
-  "description": "Entrena como un profesional. Registra tus entrenamientos, mide tu progreso y alcanza tus metas.",
+  "description": "Agenda, tareas y deporte en un solo sistema. Para quienes rinden igual en la oficina que en la pista, la ola o el asfalto. Disponible como PWA.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -10,7 +10,7 @@
   "background_color": "#000000",
   "lang": "es",
   "dir": "ltr",
-  "categories": ["fitness", "health", "sports", "lifestyle"],
+  "categories": ["productivity", "sports", "health", "lifestyle"],
   "icons": [
     {
       "src": "/icons/icon-72x72.png",

@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { Check, ListChecks } from 'lucide-react-native';
+import { Check, ListChecks, Repeat } from 'lucide-react-native';
 import { Haptics } from '../../lib/haptics';
 import { formatTime12 } from '../notes/taskTypes';
 
@@ -15,6 +15,9 @@ export interface TimelineTaskData {
   content: string;
   due_time: string | null;
   is_done: boolean;
+  task_date?: string;
+  recurrence?: 'monthly' | null;
+  recur_day?: number | null;
 }
 
 interface TaskTimelineCardProps {
@@ -41,7 +44,7 @@ export const TaskTimelineCard: React.FC<TaskTimelineCardProps> = ({ task, onTogg
       <View
         className="rounded-2xl px-4 py-3"
         style={{
-          backgroundColor: 'rgba(24, 24, 27, 0.95)',
+          backgroundColor: 'rgba(255, 255, 255, 0.05)',
           borderWidth: 1,
           borderColor: 'rgba(220, 38, 38, 0.35)',
           opacity: task.is_done ? 0.55 : 1,
@@ -51,6 +54,7 @@ export const TaskTimelineCard: React.FC<TaskTimelineCardProps> = ({ task, onTogg
           <View className="flex-row items-center gap-1.5">
             <ListChecks size={14} color={RED} />
             <Text className="text-zinc-500 text-[10px] font-bold tracking-widest">TAREA</Text>
+            {task.recurrence === 'monthly' && <Repeat size={11} color="#71717A" />}
           </View>
           {!!time && (
             <View

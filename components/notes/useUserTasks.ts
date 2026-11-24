@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { UserTask } from './taskTypes';
+import { toggleTaskDone } from './taskActions';
 
 const byPending = (a: UserTask, b: UserTask) => {
   if (a.is_done !== b.is_done) return a.is_done ? 1 : -1;
@@ -38,16 +39,9 @@ export function useUserTasks(userId?: string) {
 
   const toggleDone = useCallback(
     async (task: UserTask) => {
-      const next = !task.is_done;
-      upsertLocal({ ...task, is_done: next });
-      const { error } = await supabase
-        .from('user_tasks')
-        .update({ is_done: next, updated_at: new Date().toISOString() })
-        .eq('id', task.id);
-      if (error) {
-        console.error('Error actualizando tarea:', error);
-        upsertLocal(task);
-      }
+      const res = await toggleTaskDone(task);
+      if (!res) return;
+      upsertLocal({ ...task, task_date: res.task_date, is_done: res.is_done });
     },
     [upsertLocal]
   );

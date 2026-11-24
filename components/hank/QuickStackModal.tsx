@@ -28,9 +28,15 @@ interface StackItem {
 interface QuickStackModalProps {
   visible: boolean;
   onClose: () => void;
+  /** Vista con la que abre: lista de gestión o formulario de agregar compuesto. */
+  initialViewMode?: 'list' | 'add';
 }
 
-export const QuickStackModal: React.FC<QuickStackModalProps> = ({ visible, onClose }) => {
+export const QuickStackModal: React.FC<QuickStackModalProps> = ({
+  visible,
+  onClose,
+  initialViewMode = 'list',
+}) => {
   const [items, setItems] = useState<StackItem[]>([]);
   const [hasDualSession, setHasDualSession] = useState(false);
 
@@ -148,7 +154,7 @@ export const QuickStackModal: React.FC<QuickStackModalProps> = ({ visible, onClo
       onRemoveItem={handleRemove}
       onUpdateItem={handleUpdate}
       hasDualSession={hasDualSession}
-      initialViewMode="list"
+      initialViewMode={initialViewMode}
     />
   );
 };

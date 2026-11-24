@@ -34,6 +34,15 @@ PWA_META+='<meta name="apple-mobile-web-app-title" content="TRENS"/>'
 PWA_META+='<meta name="mobile-web-app-capable" content="yes"/>'
 PWA_META+='<link rel="manifest" href="/manifest.json"/>'
 PWA_META+='<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>'
+# SEO / redes sociales (sin caracteres especiales de perl: $ @ |)
+PWA_META+='<meta name="description" content="Agenda, tareas y deporte en un solo sistema. Para quienes rinden igual en la oficina que en la pista, la ola o el asfalto. Disponible como PWA."/>'
+PWA_META+='<meta property="og:type" content="website"/>'
+PWA_META+='<meta property="og:site_name" content="TRENS"/>'
+PWA_META+='<meta property="og:locale" content="es_ES"/>'
+PWA_META+='<meta property="og:title" content="TRENS - Sistema de alto rendimiento"/>'
+PWA_META+='<meta property="og:description" content="Agenda, tareas y deporte en un solo sistema. Para quienes rinden igual en la oficina que en la pista, la ola o el asfalto. Disponible como PWA."/>'
+PWA_META+='<meta property="og:image" content="https://trens.app/og-image.png"/>'
+PWA_META+='<meta name="twitter:card" content="summary_large_image"/>'
 
 # Estilos de protección
 PROTECTION_STYLES='<style id="trens-protection">html{background:#000!important}body{background:#000!important;margin:0!important}*{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;-webkit-tap-highlight-color:transparent!important}html,body{touch-action:pan-x pan-y!important;overscroll-behavior:none!important;-webkit-text-size-adjust:100%!important}input,textarea,[contenteditable="true"]{-webkit-user-select:text!important;user-select:text!important;touch-action:auto!important}img,video,a,button{-webkit-user-drag:none!important;touch-action:manipulation!important}</style>'
@@ -55,7 +64,7 @@ for HTML_FILE in $HTML_FILES; do
     sed -i 's/lang="en"/lang="es"/g' "$HTML_FILE" 2>/dev/null || true
     
     # 7. Agregar título
-    perl -i -pe 's|<title data-rh="true"></title>|<title>TRENS - High Performance Fitness</title>|' "$HTML_FILE" 2>/dev/null || true
+    perl -i -pe 's|<title data-rh="true"></title>|<title>TRENS - Sistema de alto rendimiento</title>|' "$HTML_FILE" 2>/dev/null || true
     
     # 8. Inyectar estilos de protección
     perl -i -pe "s|</head>|$PROTECTION_STYLES</head>|" "$HTML_FILE" 2>/dev/null || true

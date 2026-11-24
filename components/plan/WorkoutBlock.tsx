@@ -279,7 +279,7 @@ export const WorkoutBlock: React.FC<WorkoutBlockProps> = ({
     <View
       className="rounded-2xl overflow-hidden"
       style={{
-        backgroundColor: 'rgba(24, 24, 27, 0.95)',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
         borderWidth: 1,
         borderColor: 'rgba(220, 38, 38, 0.3)',
         shadowColor: '#DC2626',
